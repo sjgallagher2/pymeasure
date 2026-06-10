@@ -10,3 +10,4 @@ This section contains specific documentation on the Chroma instruments that are 
    :maxdepth: 2
 
    chroma_66205
+   chroma_63600
