@@ -22,6 +22,9 @@
 # THE SOFTWARE.
 #
 
+import numpy as np
+from enum import Enum
+
 from pymeasure.instruments import Instrument
 from pymeasure.instruments.generic_types import SCPIMixin
 from pymeasure.instruments.validators import strict_discrete_set,truncated_range
@@ -30,9 +33,55 @@ from pymeasure.instruments.validators import strict_discrete_set,truncated_range
 class Chroma66205(SCPIMixin, Instrument):
     """Control the Chroma 66205 Digital Power Meter
 
-    The 66205 is a single-channel unit. Most of its interface is identical to the other
-    6620x instruments.
+    The 66205 is a single-channel digital power meter, with voltage, current, power,
+    energy, phase, and frequency measurements, and waveform capture. A Chinese user manual
+    with programming information in English is available.
     """
+
+    class Measure(str,Enum):
+        VOLTAGE="V"
+        DC_VOLTAGE="VDC"
+        MEAN_VOLTAGE="VMEAN"
+        CURRENT="I"
+        DC_CURRENT="IDC"
+        REAL_POWER="W"
+        APPARENT_POWER="VA"
+        PEAK_POS_VOLTAGE="VPK+"
+        PEAK_POS_CURRENT="IPK+"
+        PEAK_NEG_VOLTAGE="VPK-"
+        PEAK_NEG_CURRENT="IPK-"
+        POWER_FACTOR="PF"
+        PHASE="DEG"
+        THD_VOLTAGE="THDV"
+        THD_CURRENT="THDI"
+        INRUSH_CURRENT="IS"
+        REACTIVE_POWER="VAR"
+        VOLTAGE_CREST_FACTOR="CFV"
+        CURRENT_CREST_FACTOR="CFI"
+        CHARGE_AH="AH"
+        ENERGY_WH="WH"
+        VOLTAGE_FREQUENCY="VHZ"
+        CURRENT_FREQUENCY="IHZ"
+    _MEASURES = [
+        'V','I','W','VA','VPK+','VPK-','IPK+','IPK-','PF','DEG','THDV','THDI',
+        'IS','VAR','CFV','CFI','AH','WH','VHZ','IHZ'
+    ]
+
+    CHANNEL_A_DISPLAY_OPTS = [Measure.VOLTAGE,Measure.CURRENT,Measure.REAL_POWER,
+                              Measure.APPARENT_POWER,Measure.PEAK_POS_VOLTAGE,
+                              Measure.PEAK_NEG_VOLTAGE,Measure.PEAK_POS_CURRENT,
+                              Measure.PEAK_NEG_CURRENT]
+    CHANNEL_B_DISPLAY_OPTS = [Measure.VOLTAGE,Measure.CURRENT,Measure.REAL_POWER,
+                              Measure.POWER_FACTOR,Measure.PHASE,Measure.THD_VOLTAGE,
+                              Measure.THD_CURRENT,Measure.INRUSH_CURRENT]
+    CHANNEL_C_DISPLAY_OPTS = [Measure.VOLTAGE,Measure.CURRENT,Measure.REAL_POWER,
+                              Measure.REACTIVE_POWER,Measure.VOLTAGE_CREST_FACTOR,
+                              Measure.CURRENT_CREST_FACTOR,Measure.CHARGE_AH,
+                              Measure.ENERGY_WH]
+    CHANNEL_D_DISPLAY_OPTS = [Measure.VOLTAGE,Measure.CURRENT,Measure.REAL_POWER,
+                              Measure.POWER_FACTOR,Measure.VOLTAGE_FREQUENCY,
+                              Measure.CURRENT_FREQUENCY,Measure.THD_VOLTAGE,
+                              Measure.THD_CURRENT]
 
     def __init__(self, adapter, name="Chroma 66205", **kwargs):
         super().__init__(
@@ -41,13 +90,36 @@ class Chroma66205(SCPIMixin, Instrument):
             **kwargs
         )
 
+    system_error = Instrument.measurement(
+        "SYSTEM:ERROR?",
+        """Get the error string of the instrument."""
+    )
+
     # SETTINGS #
     mode = Instrument.control(
         "CONF:MEAS:MODE?",
         "CONF:MEAS:MODE %s",
-        """Control measurement mode. Can be WINDOW or AVERAGE.""",
+        """Control measurement mode. Can be RMS, DC, or VMEAN.""",
         validator=strict_discrete_set,
-        values=["WINDOW","AVERAGE"]
+        values=["RMS","DC","VMEAN"]
+    )
+    voltage_range = Instrument.control(
+        "VOLT:RANG?",
+        "VOLT:RANG %s",
+        """Set the voltage range for measurement. Can be AUTO, V15, V30, V60, V150, V300, or
+        V600.""",
+        validator=strict_discrete_set,
+        values=["AUTO","V600","V300","V150","V60","V30","V15"],
+    )
+    current_range = Instrument.control(
+        "CURR:RANG?",
+        "CURR:RANG %s",
+        """Set the current range for measurement. Can be AUTO, A30, A20, A5, A2, A05, A03,
+        A02, A005, A002, or A0005 when external shunt is OFF, or AUTO, E015, E01, E005, E0025, or
+        E001 when external shunt is ON.""",
+        validator=strict_discrete_set,
+        values=["AUTO", "A30", "A20", "A5", "A2", "A05", 'A03', "A02", "A005", "A002", "A0005",
+                "E015","E01","E005","E0025","E001"],
     )
     averages = Instrument.control(
         "CONF:MEAS:AVERAGE?",
@@ -57,12 +129,92 @@ class Chroma66205(SCPIMixin, Instrument):
         validator=strict_discrete_set,
         values=[1,2,4,8,16,32,64],
     )
+    update_time = Instrument.control(
+        "MEAS:UPD?",
+        "MEAS:UPD %f",
+        """Set the time of measurement in seconds over which the data calculation is to
+        be performed. Can be 0.05, 0.1, 0.25, 0.5, 1, 2, 5, or 10.""",
+        validator=strict_discrete_set,
+        values=[0.05,0.1,0.25,0.5,1,2,5,10],
+    )
+    ct = Instrument.control(
+        "CONF:INP:CT?",
+        "CONF:INP:CT %s",
+        """Control CT function, ON (True) or OFF (False).""",
+        validator=strict_discrete_set,
+        values={True:"ON",False:"OFF"},
+        map_values=True,
+    )
+    ct_ratio = Instrument.control(
+        "CONF:INP:CT:RAT?",
+        "CONF:INP:CT:RAT %f",
+        """Set the CT ratio, from 1.0 to 9999.9 with 0.1 resolution.""",
+        validator=truncated_range,
+        values=[1,9999.9],
+        set_process=lambda v: round(v, 1),
+    )
+    hv = Instrument.control(
+        "CONF:INP:HV?",
+        "CONF:INP:HV %s",
+        """Control the HV function ON (True) or OFF (False).""",
+        validator=strict_discrete_set,
+        values={True:"ON",False:"OFF"},
+        map_values=True,
+    )
+    input_shunt = Instrument.control(
+        "CONF:INP:SHUN?",
+        "CONF:INP:SHUN %s",
+        """Control the external input shunt resistance ON (True) or OFF (False).""",
+        validator=strict_discrete_set,
+        values={True:"ON",False:"OFF"},
+        map_values=True,
+    )
+    input_shunt_resistance = Instrument.control(
+        "CONF:INP:SHUNT:RES?",
+        "CONF:INP:SHUNT:RES %f",
+        """Set the external input shunt resistance. Can be between 0.0000001 and 99.9999999.""",
+        validator=truncated_range,
+        values=[0.0000001,99.9999999],
+        set_process=lambda v:round(v,7)
+    )
+    null_measure_current = Instrument.control(
+        "CURR:NULL?",
+        "CURR:NULL %s",
+        """Control null measurements function for measuring current, enabled (True) or disabled
+        (False).""",
+        validator=strict_discrete_set,
+        values={True:"ON",False:"OFF"},
+        map_values=True,
+    )
+    hold = Instrument.control(
+        "CONF:HOLD?",
+        "CONF:HOLD %s",
+        """Control the hold function, ON (True) or OFF (False).""",
+        validator=strict_discrete_set,
+        values={True:"ON",False:"OFF"},
+        map_values=True,
+    )
+    hold_mode = Instrument.control(
+        "CONF:HOLD:MODE?",
+        "CONF:HOLD:MODE %s",
+        """Control the hold function mode. Can be STOP, MAX, or MIN.""",
+        validator=strict_discrete_set,
+        values=["STOP","MAX","MIN"],
+    )
+    hold_time = Instrument.control(
+        "CONF:HOLD:TIME?",
+        "CONF:HOLD:TIME %d",
+        """Control the time of the hold function in seconds, from 0s to 9999s.""",
+        validator=truncated_range,
+        values=[0,9999],
+    )
     window_time = Instrument.control(
         "CONF:MEAS:WINDOW?",
         "CONF:MEAS:WINDOW %f",
         """Control window time, from 0.1s to 60.0s in 0.1s increments.""",
         validator=truncated_range,
-        values = [0.1,60.]
+        values = [0.1,60.],
+        set_process=lambda v: round(v, 1),
     )
     window_interval = Instrument.control(
         "CONF:MEAS:WINDOW:UPDATE?",
@@ -79,6 +231,13 @@ class Chroma66205(SCPIMixin, Instrument):
         values={True:"ON",False:"OFF"},
         map_values=True,
     )
+    integration_mode = Instrument.control(
+        "CONF:INTEG:MODE?",
+        "CONF:INTEG:MODE %s",
+        """Set the mode of execution in integration mode. Can be NORMAL or CONTINUE.""",
+        validator=strict_discrete_set,
+        values=["NORMAL","CONTINUE"],
+    )
     integration_time = Instrument.control(
         "CONF:INTEGRATE:TIME?",
         "CONF:INTEGRATE:TIME %d",
@@ -89,17 +248,17 @@ class Chroma66205(SCPIMixin, Instrument):
     filter = Instrument.control(
         "CONF:FILTER?",
         "CONF:FILTER %s",
-        """Set the low pass filter ON or OFF.""",
+        """Set the bandwidth of the digital low pass filter on input signal path.
+        Can be OFF, BW500, or BW5500.""",
         validator=strict_discrete_set,
+        values=["OFF","BW500","BW5500"],
+    )
+    filter_frequency = Instrument.control(
+        "CONF:FILT:FREQ?",
+        "CONF:FILT:FREQ %s",
+        """Set the low pass filter on the path of frequency detect, True (ON) or False (OFF).""",
         values={True:"ON",False:"OFF"},
         map_values=True,
-    )
-    energy_unit = Instrument.control(
-        "CONF:ENERGY:MODE?",
-        "CONF:ENERGY:MODE %s",
-        """Set energy unit to joules (JOULES) or watt-hours (WHR).""",
-        validator=strict_discrete_set,
-        values=["JOULES","WHR"]
     )
     energy_time = Instrument.control(
         "CONF:ENERGY:TIME?",
@@ -109,8 +268,58 @@ class Chroma66205(SCPIMixin, Instrument):
         values=[0,35999999]
     )
 
+    # DISPLAY #
+    show = Instrument.setting(
+        "SHOW:DISP:ITEM %s",
+        """Control which items of measurement will be displayed on the four displays, A-D.
+        All four displays must get parameters, in a comma-separated list. There is no query
+        version of this command.
+
+        +---------+---------------------------------------+
+        | Display | Valid parameters                      |
+        +=========+=======================================+
+        | A       | V, I, W, VA, VPK+, IPK+, VPK-, IPK-   |
+        +---------+---------------------------------------+
+        | B       | V, I, W, PF, DEG, THDV, THDI, IS      |
+        +---------+---------------------------------------+
+        | C       | V, I, W, VAR, CFV, CFI, AH, WH        |
+        +---------+---------------------------------------+
+        | D       | V, I, W, PF, VHZ, IHZ, THDV, THDI     |
+        +---------+---------------------------------------+
+        """
+    )
+
+    def configure_display(self,A: Measure, B: Measure, C: Measure, D:Measure):
+        """Control the measurements shown on the four displays.
+
+        +---------+---------------------------------------+
+        | Display | Valid parameters                      |
+        +=========+=======================================+
+        | A       | V, I, W, VA, VPK+, IPK+, VPK-, IPK-   |
+        +---------+---------------------------------------+
+        | B       | V, I, W, PF, DEG, THDV, THDI, IS      |
+        +---------+---------------------------------------+
+        | C       | V, I, W, VAR, CFV, CFI, AH, WH        |
+        +---------+---------------------------------------+
+        | D       | V, I, W, PF, VHZ, IHZ, THDV, THDI     |
+        +---------+---------------------------------------+
+        """
+        if A not in self.CHANNEL_A_DISPLAY_OPTS:
+            raise ValueError(f"Parameter {A} not valid for display A. Must be "
+                             f"one of: {self.CHANNEL_A_DISPLAY_OPTS}")
+        if B not in self.CHANNEL_A_DISPLAY_OPTS:
+            raise ValueError(f"Parameter {B} not valid for display B. Must be "
+                             f"one of: {self.CHANNEL_B_DISPLAY_OPTS}")
+        if C not in self.CHANNEL_C_DISPLAY_OPTS:
+            raise ValueError(f"Parameter {C} not valid for display C. Must be "
+                             f"one of: {self.CHANNEL_C_DISPLAY_OPTS}")
+        if D not in self.CHANNEL_D_DISPLAY_OPTS:
+            raise ValueError(f"Parameter {D} not valid for display D. Must be "
+                             f"one of: {self.CHANNEL_D_DISPLAY_OPTS}")
+        self.show = f'{A.value}, {B.value}, {C.value}, {D.value}'
+
     # MEASUREMENTS #
-    voltage = Instrument.measurement(
+    voltage_rms = Instrument.measurement(
         "FETCH? V",
         """Get the last measured RMS voltage."""
     )
@@ -126,7 +335,11 @@ class Chroma66205(SCPIMixin, Instrument):
         "FETCH? VPK-",
         """Get the last measured negative peak voltage."""
     )
-    current = Instrument.measurement(
+    voltage_mean = Instrument.measurement(
+        "FETCH? VMEAN",
+        """Get the last measured mean voltage."""
+    )
+    current_rms = Instrument.measurement(
         "FETCH? I",
         """Get the last measured RMS current."""
     )
@@ -146,11 +359,15 @@ class Chroma66205(SCPIMixin, Instrument):
         "FETCH? IS",
         """Get the last measured in-rush current."""
     )
-    crest_factor = Instrument.measurement(
+    current_crest_factor = Instrument.measurement(
         "FETCH? CFI",
         """Get the last measured current crest factor."""
     )
-    power = Instrument.measurement(
+    voltage_crest_factor = Instrument.measurement(
+        "FETCH:VOLT:CRES?",
+        """Get the last measured voltage crest factor."""
+    )
+    power_real = Instrument.measurement(
         "FETCH? W",
         """Get the last measured RMS power."""
     )
@@ -161,6 +378,10 @@ class Chroma66205(SCPIMixin, Instrument):
     power_factor = Instrument.measurement(
         "FETCH? PF",
         """Get the last measured power factor."""
+    )
+    phase = Instrument.measurement(
+        "FETCH? DEG",
+        """Get phase in degrees."""
     )
     power_apparent = Instrument.measurement(
         "FETCH? VA",
@@ -182,8 +403,68 @@ class Chroma66205(SCPIMixin, Instrument):
         "FETCH? THDI",
         """Get the last measured current THD."""
     )
-    energy = Instrument.measurement(
-        "MEAS:POW:ENER?",
-        """Get the last measured energy, with units according to CONF:ENERGY:MODE."""
+    energy_wh = Instrument.measurement(
+        "FETCH? WH",
+        """Get the last measured energy in units of watt-hours."""
     )
+    charge_ah = Instrument.measurement(
+        "FETCH? AH",
+        """Get the last measured charge in units of amp-hours."""
+    )
+    trigger_mode = Instrument.control(
+        "TRIG:MODE?",
+        "TRIG:MODE %s",
+        """Set which mode will be triggered by trigger command.
+        Can be NONE|INTEGRATION|INRUSH|LIMIT.""",
+        validator=strict_discrete_set,
+        values=["NONE","INTEGRATION","INRUSH","LIMIT"],
+    )
+    trigger = Instrument.control(
+        "TRIGGER?",
+        "TRIGGER %s",
+        """Set trigger for energy calculation, inrush, or limit (go/no-go).
+        Status is STOP|FINISH|RUNNING.
+        To trigger, pass 'ON'. To stop or reset integration cycle, pass 'OFF'.""",
+    )
+
+    def measure(self,param: Measure):
+        """Get a measurement. See Chroma66205.Measure."""
+        return float(self.ask(f"MEAS? {param.value}").strip())
+
+    def integrate_energy(self,integration_time_s: float=10.):
+        # Set up
+        self.energy_time = integration_time_s
+        self.trigger_mode = "INTEGRATION"
+        # Check state and reset if necessary
+        if self.trigger == "FINISH":
+            self.trigger = "OFF"  # Reset
+        # Trigger
+        self.trigger = "ON"
+        tr = self.trigger
+        if tr != "RUNNING":
+            print(f"Warning: Triggered but trigger is not set to 'RUNNING' (instead got {tr})")
+        else:
+            while self.trigger == "RUNNING":
+                pass
+        return self.energy_wh
+
+    def capture_waveform(self,param:str='V'):
+        """Get waveform as ts,wave for voltage (V) or current (I)."""
+        if param not in ['I','V']:
+            raise ValueError(f"Unexpected parameter {param}. Must be 'V' or 'I'.")
+        timeout = 100
+        while self.ask('WAVEFORM:CAPTURE?') != 'OK\n' and timeout > 0:
+            timeout -= 1
+        print("Receiving waveform. This may take a minute...")
+        bvals = self.binary_values(f'WAVEFORM:DATA? {param}',dtype=np.uint8)
+        print("Done.")
+        bvals = bvals[len('#48192'):-1]  # strip
+        wave = bvals.view(np.float32)
+
+        # Wave contains exactly two 60Hz cycles, so sample rate is 61440 (=2048 Samples / 2 * 60Hz)
+        # This might not be consistent across all settings and configurations?
+        Fs=61.44e3
+        ts = np.arange(0,len(wave)/Fs,1/Fs)
+        return ts,wave
+
 
