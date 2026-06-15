@@ -6,6 +6,10 @@ Removed
 - Remove GUI dependencies from default dependencies. Install pymeasure with gui dependencies with :code:`pip install pymeasure[gui]`. Conda still installs all dependencies.
 - Remove deprecated SCPI methods and properties from :code:`Instrument`.
 
+Deprecated
+----------
+- Deprecate Toptica Ibeamsmart :code:`enable_continous`, use :code:`enable_continuous` instead.
+- Deprecate Thermotron 3800 :code:`initalize_oven`, use :code:`initialize_oven` instead.
 
 Version 0.16.0 (2026-05-20)
 ===========================
