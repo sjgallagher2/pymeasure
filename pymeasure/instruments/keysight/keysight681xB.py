@@ -53,6 +53,7 @@ class Modes(StrEnum):
 class Keysight681xB(SCPIMixin, Instrument):
     """Represents the Keysight 6811B, 6812B, and 6813B AC Power Source/Analyzers."""
 
+    _BOOLS = {True: 1, False: 0}
 
     def __init__(self, adapter, name="Keysight 681xB AC Power Source/Analyzer",
                  **kwargs):
@@ -68,7 +69,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         "CURRENT?","CURRENT %f",
         """Control the AC RMS current limit setpoint in amperes.""",
         validator=truncated_range,
-        values=[0,13.0],  # limit for 6813B only
+        values=[0,13.0],  # default limit, for 6813B
     )
     frequency_setpoint = Instrument.control(
         "FREQ?","FREQ %f",
@@ -82,6 +83,20 @@ class Keysight681xB(SCPIMixin, Instrument):
         waveform.""",
         get_process = lambda v: Functions(v),
     )
+    output_state = Instrument.control(
+        "OUTPUT:STATE?","OUTPUT:STATE %s",
+        """Control the enable/disable state of the AC source (bool).
+
+        See also :py:method:`output_enable()`.
+        """,
+        validator=strict_discrete_set,
+        values=_BOOLS,
+        map_values=True,
+    )
+    def output_enable(self,enable: bool = True):
+        """Enable or disable the AC source."""
+        self.output_state = enable
+
 
 """
 === LIMITS ===
@@ -94,7 +109,7 @@ class Keysight681xB(SCPIMixin, Instrument):
 -----------------------
 
 === SET POINT ===
-VOLT <V>
+# VOLT <V>
 VOLT:TRIG <V>
 VOLT:MODE FIX|STEP|PULS|LIST
 VOLT:OFFSET <V>
@@ -115,19 +130,19 @@ VOLT:SLEW INFINITY
 VOLT:SLEW:MODE FIX|STEP|PULS|LIST
 VOLT:SLEW:TRIG <S>
 VOLT:SLEW:TRIG INFINITY
-CURRENT <I>
+# CURRENT <I>
 CURR:PEAK <I>
 CURR:PEAK:MODE FIX|STEP|PULS|LIST
 CURR:TRIG <I>
 CURR:PROT:STATE OFF|ON
-FREQ <F>
+# FREQ <F>
 FREQ:MODE FIX|STEP|PULS|LIST
 FREQ:SLEW <S>
 FREQ:SLEW INFINITY
 FREQ:SLEW:MODE FIX|STEP|PULS|LIST
 FREQ:SLEW:TRIG <S>
 FREQ:TRIG <F>
-FUNC SIN|SQU|CSIN|<user>
+# FUNC SIN|SQU|CSIN|<user>
 FUNC:MODE FIX|STEP|PULS|LIST
 FUNC:TRIG SIN|SQU|CSIN|<table>
 FUNC:CSIN <N>
@@ -136,7 +151,7 @@ PHASE:MODE FIX|STEP|PULS|LIST
 PHASE:TRIG <P>
 
 === OUTPUT ===
-OUTP:STATE OFF|ON
+# OUTP:STATE OFF|ON
 OUTPUT:COUPLING AC|DC
 OUTPUT:DFI:STATE OFF|ON
 OUTPUT:IMPEDANCE:STATE ON|OFF
@@ -153,7 +168,6 @@ MEAS:VOLT:ACDC?
 MEAS:VOLT:HARMONIC:AMPL? <N>          for harmonic N
 MEAS:VOLT:HARMONIC:PHASE? <N>         for harmonic N
 MEAS:VOLT:HARMONIC:THD?
-MEAS:VOLT:
 MEAS:CURR:DC?
 MEAS:CURR:AC?
 MEAS:CURR:ACDC?
