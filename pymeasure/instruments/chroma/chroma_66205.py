@@ -455,7 +455,10 @@ class Chroma66205(SCPIMixin, Instrument):
         return self.energy_wh
 
     def capture_waveform(self,param:str='V'):
-        """Get waveform as ts,wave for voltage (V) or current (I)."""
+        """Get waveform as ts,wave for voltage (V) or current (I).
+
+        :return: tuple of numpy arrays as (time,ydata)
+        """
         if param not in ['I','V']:
             raise ValueError(f"Unexpected parameter {param}. Must be 'V' or 'I'.")
         timeout = 100
