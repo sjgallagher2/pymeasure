@@ -23,9 +23,11 @@
 #
 from enum import Enum
 
+import numpy as np
+
 from pymeasure.instruments import Instrument
 from pymeasure.instruments.generic_types import SCPIMixin
-from pymeasure.instruments.validators import strict_discrete_set, strict_range, truncated_range
+from pymeasure.instruments.validators import strict_discrete_set, truncated_range
 
 try:
     from enum import StrEnum
@@ -81,7 +83,6 @@ class Keysight681xB(SCPIMixin, Instrument):
         "FUNC?","FUNC %s",
         """Control the output function of the ac source. Can be SIN, SQU, CSIN, or a user
         waveform.""",
-        get_process = lambda v: Functions(v),
     )
     output_state = Instrument.control(
         "OUTPUT:STATE?","OUTPUT:STATE %s",
@@ -96,6 +97,70 @@ class Keysight681xB(SCPIMixin, Instrument):
     def output_enable(self,enable: bool = True):
         """Enable or disable the AC source."""
         self.output_state = enable
+
+    user_wfm_catalog = Instrument.measurement(
+        "TRACE:CATALOG?",
+        """Get the user waveform catalog.""",
+        get_process_list=lambda names: [name.replace('"','') for name in names]
+    )
+    def get_user_wfm_data(self,name: str):
+        data_str = self.ask(f"TRACE:DATA? {name}")
+        data = np.array(data_str.strip().split(','),dtype=float)
+        return data
+
+    def get_user_waveform_catalog(self):
+        """Query the list of user waveforms.."""
+        print("Retrieving user waveform catalog. This might take a minute...")
+        names = self.user_wfm_catalog
+        cat = {}
+        for name in names:
+            if name not in ["SINUSOID","SQUARE","CSINUSOID"]:
+                namedata = self.get_user_wfm_data(name)
+                cat[name] = namedata
+        return cat
+
+    def add_user_waveform(self,name,data1024,delete_existing=False):
+        """Add a waveform called `name` with 1024 float data points in [0.0, 1.0] to the user
+        waveform catalog.
+
+        From the programming guide:
+        "data points define the relative amplitudes of exactly one cycle of the waveform. The first
+        data point defines the amplitude that will be output at 0 degrees phase reference."
+
+        "Data points can be in any arbitrary units. The ac source scales the data to an
+        internal format that removes the dc component and ensures that the correct ac rms
+        voltage is output when the waveform is selected. When queried, trace data is returned
+        as normalized values in the range of 1. Waveform data is stored in nonvolatile memory
+        and is retained when input power is removed. Up to 12 user defined waveforms may be
+        created and stored."
+
+        :param name: str, name of waveform, will be converted to ALL CAPS.
+        :param data1024: numpy array of length 1024, dtype float, all values in [0.0, 1.0].
+                         Points will be rounded to 5 digits of precision.
+        :param delete_existing: if True, any waveform with the same name will be deleted before
+                                adding the new data. If False, raises an exception if name exists.
+        """
+        if len(data1024) != 1024:
+            raise ValueError(f"Length error, received array of length {len(data1024)}; length "\
+                             "must be 1024.")
+        data1024f = data1024.astype(float)
+
+        # Preprocess name, delete existing trace if present
+        name = name.upper()
+        if name in self.user_wfm_catalog:
+            if delete_existing:
+                print(f"NOTE: Deleting existing waveform '{name}'")
+                self.write(f'TRACE:DEL {name}')  # Remove existing
+            else:
+                raise ValueError("Waveform with this name already exists. To override, "\
+                                 "use `delete_existing=True`.")
+
+        # Convert to 5 digits of precision
+        wave = [f'{x:.5f}' for x in data1024f]
+
+        # Add name if needed, then write data
+        self.write('TRACE:DEF QSW')
+        self.write('TRACE:DATA QSW, '+', '.join(wave))
 
 
 """
