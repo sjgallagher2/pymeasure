@@ -1,0 +1,448 @@
+#
+# This file is part of the PyMeasure package.
+#
+# Copyright (c) 2013-2026 PyMeasure Developers
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+from enum import Enum
+from time import sleep
+
+import numpy as np
+
+from pymeasure.instruments import Instrument
+from pymeasure.instruments.generic_types import SCPIMixin
+from pymeasure.instruments.validators import strict_discrete_set, truncated_range
+
+try:
+    from enum import StrEnum
+except ImportError:
+    class StrEnum(str, Enum):
+        """Until StrEnum is broadly available / pymeasure relies on python <=
+        3.10.x."""
+
+        def __str__(self):
+            return self.value
+
+class Functions(StrEnum):
+    SINE="SIN"
+    SQUARE="SQU"
+    CLIPPED_SINE="CSIN"  # Clipped sinewave output. Both positive and negative peak amplitudes
+                         # are clipped at a value determined by the FUNC:CSIN command.
+
+class Modes(StrEnum):
+    FIXED="FIX"   # unaffected by a triggered output transient.
+    STEP="STEP"   # programmed to the value set by X:TRIG when a triggered transient occurs.
+    PULSE="PULS"  # changed to the value set by X:TRIG for a duration determined by the pulse
+                  # commands.
+    LIST="LIST"   # controlled by the waveform shape list when a triggered transient occurs.
+
+class Keysight681xB(SCPIMixin, Instrument):
+    """Represents the Keysight 6811B, 6812B, and 6813B AC Power Source/Analyzers."""
+
+    _BOOLS = {True: 1, False: 0}
+
+    def __init__(self, adapter, name="Keysight 681xB AC Power Source/Analyzer",
+                 **kwargs):
+        super().__init__(adapter, name, **kwargs)
+
+    voltage_setpoint = Instrument.control(
+        "VOLT?", "VOLT %f",
+        """Control the AC RMS voltage amplitude setpoint in volts.""",
+        validator=truncated_range,
+        values=[0,300],
+    )
+    clipped_sine_setpoint_pct = Instrument.control(
+        "FUNC:CSIN?","FUNC:CSIN %f",
+        """Control clipped sine clipping point as a percent (0-100) of peak amplitude.""",
+        validator=truncated_range,
+        values=[0.,100.]
+    )
+    current_setpoint = Instrument.control(
+        "CURRENT?","CURRENT %f",
+        """Control the AC RMS current limit setpoint in amperes.""",
+        validator=truncated_range,
+        values=[0,13.0],  # default limit, for 6813B
+    )
+    frequency_setpoint = Instrument.control(
+        "FREQ?","FREQ %f",
+        """Control the frequency setpoint in hertz""",
+        validator=truncated_range,
+        values=[45,1000]
+    )
+    voltage_dc = Instrument.measurement(
+        "MEAS:VOLT:DC?",
+        """Measure DC voltage in volts."""
+    )
+    voltage_ac = Instrument.measurement(
+        "MEAS:VOLT:AC?",
+        """Measure AC RMS voltage in volts."""
+    )
+    voltage_acdc = Instrument.measurement(
+        "MEAS:VOLT:ACDC?",
+        """Measure ACDC voltage in volts."""
+    )
+    current_dc = Instrument.measurement(
+        "MEAS:CURR:DC?",
+        """Measure DC current in amperes."""
+    )
+    current_ac = Instrument.measurement(
+        "MEAS:CURR:AC?",
+        """Measure AC RMS current in amperes."""
+    )
+    current_acdc = Instrument.measurement(
+        "MEAS:CURR:ACDC?",
+        """Measure ACDC current in amperes."""
+    )
+    current_amplitude = Instrument.measurement(
+        "MEAS:CURR:AMPL:MAX?",
+        """Measure peak current amplitude in amperes."""
+    )
+    crest_factor = Instrument.measurement(
+        "MEAS:CURR:CRESTFACTOR?",
+        """Measure current crest factor."""
+    )
+    power_dc = Instrument.measurement(
+        "MEAS:POW:DC?",
+        """Measure DC power."""
+    )
+    power_real = Instrument.measurement(
+        "MEAS:POW:AC:REAL?",
+        """Measure AC real power in watts."""
+    )
+    power_apparent = Instrument.measurement(
+        "MEAS:POW:AC:APPARENT?",
+        """Measure AC apparent power in VA."""
+    )
+    power_reactive = Instrument.measurement(
+        "MEAS:POW:AC:REACTIVE?",
+        """Measure AC reactive power in VAR."""
+    )
+    power_total = Instrument.measurement(
+        "MEAS:POW:AC:TOTAL?",
+        """Measure three-phase total AC power."""
+    )
+    frequency = Instrument.measurement(
+        "MEAS:FREQUENCY?",
+        """Measure AC frequency in hertz."""
+    )
+    power_factor = Instrument.measurement(
+        "MEAS:POW:AC:PFACTOR?",
+        """Measure AC power factor in degrees."""
+    )
+    output_function = Instrument.control(
+        "FUNC?","FUNC %s",
+        """Control the output function of the ac source. Can be SIN, SQU, CSIN, or a user
+        waveform.""",
+    )
+    output_state = Instrument.control(
+        "OUTPUT:STATE?","OUTPUT:STATE %s",
+        """Control the enable/disable state of the AC source (bool).
+
+        See also :py:method:`output_enable()`.
+        """,
+        validator=strict_discrete_set,
+        values=_BOOLS,
+        map_values=True,
+    )
+
+    trigger_source = Instrument.control(
+        "TRIG:SOUR?","TRIG:SEQ1:SOUR %s",
+        """Control the trigger source for first sequence. Can be BUS|EXTernal|IMMediate.
+
+        When set to BUS, the trigger will activate after receiving a *TRG command over GPIB.
+        When set to EXTernal, the AC source backplane BNC trigger input is used as the trigger.
+        When set to IMMediate, the trigger is generated as soon as the trigger system is initiated.
+        """,
+        validator=strict_discrete_set,
+        values=["BUS","EXT","EXTERNAL","IMM","IMMEDIATE"],
+    )
+    trigger_sync_source = Instrument.control(
+        "TRIG:SYNC:SOUR?","TRIG:SYNC:SOUR %s",
+        """Control the trigger system synchronization source.
+        The trigger system can delay the trigger event until a certain synchronization event
+        occurs. In particular, it can delay until the waveform phase reaches a particular value.
+
+        Values can be IMMediate|PHASe.
+        """,
+        validator=strict_discrete_set,
+        values=['IMM','IMMEDIATE','PHAS','PHASE'],
+    )
+    trigger_sync_phase = Instrument.control(
+        "TRIG:SYNC:PHASE?","TRIG:SYNC:PHASE %f",
+        """Control the trigger synchronization phase value.
+
+        When the trigger is phase synchronized, it waits until the waveform reaches this phase
+        before the triggered event actually occurs.
+        """,
+        validator=truncated_range,
+        values=[0,360],
+    )
+
+    def arm_immediate_trigger(self):
+        """Arm the trigger system (SEQ1). Before a trigger can have effect, the trigger subsystem
+        must be armed, or 'initialized'. This method arms the trigger for a single event."""
+        self.write('INIT:SEQ1')
+
+    def arm_continuous_trigger(self,run=True):
+        """Arm the trigger system (SEQ1). Before a trigger can have effect, the trigger subsystem
+        must be armed, or 'initialized'. This method arms or disarms the trigger for a continuous
+        run.
+
+        :param run: if True, enable continuous triggering; if False, stop continuous triggering."""
+        if run:
+            self.write('INIT:CONT:SEQ1 ON')
+        else:
+            self.write('INIT:CONT:SEQ1 OFF')
+
+    def send_GPIB_trigger(self):
+        """Send a GPIB trigger signal. The trigger source must be set to BUS for this to have
+        any effect. This function forces the trigger source to be BUS before sending."""
+        self.trigger_source = 'BUS'
+        self.write('*TRG')
+
+    def output_enable(self,enable: bool = True):
+        """Enable or disable the AC source."""
+        self.output_state = enable
+
+    def output_enable_at_phase(self,trig_phase: float):
+        """Enable the output at a given phase.
+
+        This method uses the existing voltage setpoint to set a voltage step level on trigger.
+        The voltage setpoint is set to 0V, the output is enabled, and the trigger system is used
+        to step the voltage to the prior setpoint when we send *TRG and the waveform phase
+        reaches `phase`. A GPIB trigger is sent.
+
+        After this method, the voltage setpoint will be the same as before, the trigger SYNC
+        source will be PHASE, and the voltage trigger mode will be STEP.
+
+        Example:
+        ```python
+        # Reset and configure the output
+        acsource.reset()
+        acsource.voltage_setpoint = 50
+        acsource.frequency_setpoint = 60
+        acsource.output_enable_at_phase(90)  # start waveform at 90 degrees
+        ```
+        """
+        vset = self.voltage_setpoint
+        self.voltage_setpoint = 0
+        self.output_enable(True)
+        sleep(1)  # MUST dwell here for trigger to work.
+        self.voltage_trigger_mode = 'STEP'
+        self.voltage_trigger_level = vset
+        self.trigger_sync_source = 'PHASE'
+        self.trigger_sync_phase = trig_phase
+        self.arm_immediate_trigger()
+        self.send_GPIB_trigger()
+
+    # WAVEFORMS #
+    user_wfm_catalog = Instrument.measurement(
+        "TRACE:CATALOG?",
+        """Get the user waveform catalog.""",
+        get_process_list=lambda names: [name.replace('"','') for name in names]
+    )
+    def get_user_wfm_data(self,name: str):
+        """Get the data points for a particular user waveform.
+
+        :param name: internal name of user waveform.
+        :return: numpy array of y-data points with dtype float.
+        """
+        data_str = self.ask(f"TRACE:DATA? {name.upper()}")
+        data = np.array(data_str.strip().split(','),dtype=float)
+        return data
+
+    def get_user_waveform_catalog(self):
+        """Query the list of user waveforms.."""
+        print("Retrieving user waveform catalog. This might take a minute...")
+        names = self.user_wfm_catalog
+        cat = {}
+        for name in names:
+            if name not in ["SINUSOID","SQUARE","CSINUSOID"]:
+                namedata = self.get_user_wfm_data(name)
+                cat[name] = namedata
+        return cat
+
+    def delete_user_waveform(self,name: str):
+        """Delete a user waveform by name."""
+        self.write(f'TRACE:DEL {name}')
+
+    def define_user_waveform_name(self,name: str):
+        """Define a user waveform name without data."""
+        self.write(f'TRACE:DEF {name}')
+
+    def add_user_waveform(self,name,data1024,delete_existing=False):
+        """Add a waveform called `name` with 1024 float data points in [0.0, 1.0] to the user
+        waveform catalog.
+
+        From the programming guide:
+        "data points define the relative amplitudes of exactly one cycle of the waveform. The first
+        data point defines the amplitude that will be output at 0 degrees phase reference."
+
+        "Data points can be in any arbitrary units. The ac source scales the data to an
+        internal format that removes the dc component and ensures that the correct ac rms
+        voltage is output when the waveform is selected. When queried, trace data is returned
+        as normalized values in the range of 1. Waveform data is stored in nonvolatile memory
+        and is retained when input power is removed. Up to 12 user defined waveforms may be
+        created and stored."
+
+        :param name: str, name of waveform, will be converted to ALL CAPS.
+        :param data1024: numpy array of length 1024, dtype float, all values in [0.0, 1.0].
+                         Points will be rounded to 5 digits of precision.
+        :param delete_existing: if True, any waveform with the same name will be deleted before
+                                adding the new data. If False, raises an exception if name exists.
+        """
+        if len(data1024) != 1024:
+            raise ValueError(f"Length error, received array of length {len(data1024)}; length "\
+                             "must be 1024.")
+        data1024f = data1024.astype(float)
+
+        # Preprocess name, delete existing trace if present
+        name = name.upper()
+        if name in self.user_wfm_catalog:
+            if delete_existing:
+                print(f"NOTE: Deleting existing waveform '{name}'")
+                self.delete_user_waveform(name)
+            else:
+                raise ValueError("Waveform with this name already exists. To override, "\
+                                 "use `delete_existing=True`.")
+
+        # Convert to 5 digits of precision
+        wave = [f'{x:.5f}' for x in data1024f]
+
+        # Add name if needed, then write data
+        self.define_user_waveform_name(name)
+        self.write(f'TRACE:DATA {name}, '+', '.join(wave))
+
+
+"""
+=== LIMITS ===
+300Vrms max
+13Arms max (6813B)
+1350W max (6813B
++/- 425VDC max
+10ADC max (6813B)
+45Hz-1kHz frequency
+-----------------------
+
+=== SET POINT ===
+# VOLT <V>
+# CURRENT <I>
+# FREQ <F>
+# FUNC SIN|SQU|CSIN|<user>
+# FUNC:CSIN <N>
+
+VOLT:TRIG <V>
+VOLT:MODE FIX|STEP|PULS|LIST
+VOLT:OFFSET <V>
+VOLT:OFFSET:MODE FIX|STEP|PULS|LIST
+VOLT:OFFSET:TRIG <V>
+VOLT:OFFSET:SLEW <S>
+VOLT:OFFSET:SLEW INFINITY
+VOLT:OFFSET:SLEW:MODE FIX|STEP|PULSE|LIST
+VOLT:OFFSET:SLEW:TRIG <S>
+VOLT:OFFSET:SLEW:TRIG INFINITY
+VOLT:PROT <V>
+VOLT:PROT:STATE OFF|ON
+VOLT:RANGE <V>
+VOLT:SENSE:DETECTOR RTIME|RMS
+VOLT:SENSE:SOURCE INTERNAL|EXTERNAL
+VOLT:SLEW <S>
+VOLT:SLEW INFINITY
+VOLT:SLEW:MODE FIX|STEP|PULS|LIST
+VOLT:SLEW:TRIG <S>
+VOLT:SLEW:TRIG INFINITY
+CURR:PEAK <I>
+CURR:PEAK:MODE FIX|STEP|PULS|LIST
+CURR:TRIG <I>
+CURR:PROT:STATE OFF|ON
+FREQ:MODE FIX|STEP|PULS|LIST
+FREQ:SLEW <S>
+FREQ:SLEW INFINITY
+FREQ:SLEW:MODE FIX|STEP|PULS|LIST
+FREQ:SLEW:TRIG <S>
+FREQ:TRIG <F>
+FUNC:MODE FIX|STEP|PULS|LIST
+FUNC:TRIG SIN|SQU|CSIN|<table>
+PHASE <P>
+PHASE:MODE FIX|STEP|PULS|LIST
+PHASE:TRIG <P>
+
+=== OUTPUT ===
+# OUTP:STATE OFF|ON
+OUTPUT:COUPLING AC|DC
+OUTPUT:DFI:STATE OFF|ON
+OUTPUT:IMPEDANCE:STATE ON|OFF
+OUTPUT:IMPEDANCE:REAL <R>
+OUTPUT:IMPEDANCE:REACTIVE <X>
+OUTPUT:PON:STATE RST|RCL0
+OUTPUT:PROT:CLEAR
+OUTPUT:PROT:DELAY <t>
+
+=== MEASUREMENTS ===
+# MEAS:VOLT:DC?
+# MEAS:VOLT:AC?
+# MEAS:VOLT:ACDC?
+# MEAS:CURR:DC?
+# MEAS:CURR:AC?
+# MEAS:CURR:ACDC?
+# MEAS:CURR:AMPL:MAX?
+# MEAS:CURR:CRESTFACTOR?
+# MEAS:POW:DC?
+# MEAS:POW:AC:REAL?
+# MEAS:POW:AC:APPARENT?
+# MEAS:POW:AC:REACTIVE?
+# MEAS:POW:AC:PFACTOR?
+# MEAS:POW:AC:TOTAL?             3-phase total power
+# MEAS:FREQUENCY?
+MEAS:VOLT:HARMONIC:AMPL? <N>          for harmonic N
+MEAS:VOLT:HARMONIC:PHASE? <N>         for harmonic N
+MEAS:VOLT:HARMONIC:THD?
+MEAS:CURR:HARMONIC:AMPL? <N>          for harmonic N
+MEAS:CURR:HARMONIC:PHASE? <N>         for harmonic N
+MEAS:CURR:HARMONIC:THD?
+MEAS:CURR:NEUTRAL:DC?
+MEAS:CURR:NEUTRAL:
+MEAS:CURR:NEUTRAL:
+MEAS:CURR:NEUTRAL:
+MEAS:CURR:NEUT:HARMONIC:AMPL? <N>     for harmonic N
+MEAS:CURR:NEUT:HARMONIC:PHASE? <N>    for harmonic N
+
+=== SYSTEM ===
+SYSTEM:CONF NORM|IEC
+SYSTEM:ERROR?
+
+=== TRIGGERING ===
+ABORT
+INIT
+INIT:SEQ1|SEQ2|SEQ3
+INIT:NAME TRAN|ACQ
+INIT:CONTINUOUS:SEQ[1] OFF|ON
+INIT:CONTINUOUS:NAME TRAN OFF|ON
+TRIG
+TRIG:SYNC:SOURCE PHASE|IMMEDIATE
+TRIG:SYNC:PHASE <P>
+TRIG:ACQ
+TRIG:ACQ:SOURCE BUS|EXT|TTLT
+TRIG:SEQ1:DEFINE TRANSIENT
+TRIG:SEQ2:DEFINE SYNCHRONIZE
+TRIG:SEQ3:DEFINE ACQUIRE
+"""
+
+
