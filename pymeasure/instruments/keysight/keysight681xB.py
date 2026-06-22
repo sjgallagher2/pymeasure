@@ -22,6 +22,7 @@
 # THE SOFTWARE.
 #
 from enum import Enum
+from time import sleep
 
 import numpy as np
 
@@ -66,6 +67,18 @@ class Keysight681xB(SCPIMixin, Instrument):
         validator=truncated_range,
         values=[0,300],
     )
+    voltage_trigger_mode = Instrument.control(
+        "VOLT:MODE?","VOLT:MODE %s",
+        """Control the voltage trigger mode. Can be FIXed|STEP|PULSe|LIST.""",
+        validator=strict_discrete_set,
+        values=['FIX','FIXED','STEP','PULS','PULSE','LIST']
+    )
+    voltage_trigger_level = Instrument.control(
+        "VOLT:TRIG?","VOLT:TRIG %f",
+        """Control the RMS output voltage on a trigger event.""",
+        validator=truncated_range,
+        values=[0,300],
+    )
     current_setpoint = Instrument.control(
         "CURRENT?","CURRENT %f",
         """Control the AC RMS current limit setpoint in amperes.""",
@@ -83,6 +96,173 @@ class Keysight681xB(SCPIMixin, Instrument):
         """Control the output function of the ac source. Can be SIN, SQU, CSIN, or a user
         waveform.""",
     )
+    output_state = Instrument.control(
+        "OUTPUT:STATE?","OUTPUT:STATE %s",
+        """Control the enable/disable state of the AC source (bool).
+
+        See also :py:method:`output_enable()`.
+        """,
+        validator=strict_discrete_set,
+        values=_BOOLS,
+        map_values=True,
+    )
+
+    trigger_source = Instrument.control(
+        "TRIG:SOUR?","TRIG:SEQ1:SOUR %s",
+        """Control the trigger source for first sequence. Can be BUS|EXTernal|IMMediate.
+
+        When set to BUS, the trigger will activate after receiving a *TRG command over GPIB.
+        When set to EXTernal, the AC source backplane BNC trigger input is used as the trigger.
+        When set to IMMediate, the trigger is generated as soon as the trigger system is initiated.
+        """,
+        validator=strict_discrete_set,
+        values=["BUS","EXT","EXTERNAL","IMM","IMMEDIATE"],
+    )
+    trigger_sync_source = Instrument.control(
+        "TRIG:SYNC:SOUR?","TRIG:SYNC:SOUR %s",
+        """Control the trigger system synchronization source.
+        The trigger system can delay the trigger event until a certain synchronization event
+        occurs. In particular, it can delay until the waveform phase reaches a particular value.
+
+        Values can be IMMediate|PHASe.
+        """,
+        validator=strict_discrete_set,
+        values=['IMM','IMMEDIATE','PHAS','PHASE'],
+    )
+    trigger_sync_phase = Instrument.control(
+        "TRIG:SYNC:PHASE?","TRIG:SYNC:PHASE %f",
+        """Control the trigger synchronization phase value.
+
+        When the trigger is phase synchronized, it waits until the waveform reaches this phase
+        before the triggered event actually occurs.
+        """,
+        validator=truncated_range,
+        values=[0,360],
+    )
+
+    def arm_immediate_trigger(self):
+        """Arm the trigger system (SEQ1). Before a trigger can have effect, the trigger subsystem
+        must be armed, or 'initialized'. This method arms the trigger for a single event."""
+        self.write('INIT:SEQ1')
+
+    def arm_continuous_trigger(self,run=True):
+        """Arm the trigger system (SEQ1). Before a trigger can have effect, the trigger subsystem
+        must be armed, or 'initialized'. This method arms or disarms the trigger for a continuous
+        run.
+
+        :param run: if True, enable continuous triggering; if False, stop continuous triggering."""
+        if run:
+            self.write('INIT:CONT:SEQ1 ON')
+        else:
+            self.write('INIT:CONT:SEQ1 OFF')
+
+
+    def send_GPIB_trigger(self):
+        """Send a GPIB trigger signal. The trigger source must be set to BUS for this to have
+        any effect. This function forces the trigger source to be BUS before sending."""
+        self.trigger_source = 'BUS'
+        self.write('*TRG')
+
+    def output_enable(self,enable: bool = True):
+        """Enable or disable the AC source."""
+        self.output_state = enable
+
+    def output_enable_at_phase(self,trig_phase: float):
+        """Enable the output at a given phase.
+
+        This method uses the existing voltage setpoint to set a voltage step level on trigger.
+        The voltage setpoint is set to 0V, the output is enabled, and the trigger system is used
+        to step the voltage to the prior setpoint when we send *TRG and the waveform phase
+        reaches `phase`. A GPIB trigger is sent.
+
+        After this method, the voltage setpoint will be the same as before, the trigger SYNC
+        source will be PHASE, and the voltage trigger mode will be STEP.
+
+        Example:
+        ```python
+        # Reset and configure the output
+        acsource.reset()
+        acsource.voltage_setpoint = 50
+        acsource.frequency_setpoint = 60
+        acsource.output_enable_at_phase(90)  # start waveform at 90 degrees
+        ```
+        """
+        vset = self.voltage_setpoint
+        self.voltage_setpoint = 0
+        self.output_enable(True)
+        sleep(1)  # MUST dwell here for trigger to work.
+        self.voltage_trigger_mode = 'STEP'
+        self.voltage_trigger_level = vset
+        self.trigger_sync_source = 'PHASE'
+        self.trigger_sync_phase = trig_phase
+        self.arm_immediate_trigger()
+        self.send_GPIB_trigger()
+
+    # WAVEFORMS #
+    user_wfm_catalog = Instrument.measurement(
+        "TRACE:CATALOG?",
+        """Get the user waveform catalog.""",
+        get_process_list=lambda names: [name.replace('"','') for name in names]
+    )
+    def get_user_wfm_data(self,name: str):
+        data_str = self.ask(f"TRACE:DATA? {name}")
+        data = np.array(data_str.strip().split(','),dtype=float)
+        return data
+
+    def get_user_waveform_catalog(self):
+        """Query the list of user waveforms.."""
+        print("Retrieving user waveform catalog. This might take a minute...")
+        names = self.user_wfm_catalog
+        cat = {}
+        for name in names:
+            if name not in ["SINUSOID","SQUARE","CSINUSOID"]:
+                namedata = self.get_user_wfm_data(name)
+                cat[name] = namedata
+        return cat
+
+    def add_user_waveform(self,name,data1024,delete_existing=False):
+        """Add a waveform called `name` with 1024 float data points in [0.0, 1.0] to the user
+        waveform catalog.
+
+        From the programming guide:
+        "data points define the relative amplitudes of exactly one cycle of the waveform. The first
+        data point defines the amplitude that will be output at 0 degrees phase reference."
+
+        "Data points can be in any arbitrary units. The ac source scales the data to an
+        internal format that removes the dc component and ensures that the correct ac rms
+        voltage is output when the waveform is selected. When queried, trace data is returned
+        as normalized values in the range of 1. Waveform data is stored in nonvolatile memory
+        and is retained when input power is removed. Up to 12 user defined waveforms may be
+        created and stored."
+
+        :param name: str, name of waveform, will be converted to ALL CAPS.
+        :param data1024: numpy array of length 1024, dtype float, all values in [0.0, 1.0].
+                         Points will be rounded to 5 digits of precision.
+        :param delete_existing: if True, any waveform with the same name will be deleted before
+                                adding the new data. If False, raises an exception if name exists.
+        """
+        if len(data1024) != 1024:
+            raise ValueError(f"Length error, received array of length {len(data1024)}; length "\
+                             "must be 1024.")
+        data1024f = data1024.astype(float)
+
+        # Preprocess name, delete existing trace if present
+        name = name.upper()
+        if name in self.user_wfm_catalog:
+            if delete_existing:
+                print(f"NOTE: Deleting existing waveform '{name}'")
+                self.write(f'TRACE:DEL {name}')  # Remove existing
+            else:
+                raise ValueError("Waveform with this name already exists. To override, "\
+                                 "use `delete_existing=True`.")
+
+        # Convert to 5 digits of precision
+        wave = [f'{x:.5f}' for x in data1024f]
+
+        # Add name if needed, then write data
+        self.write('TRACE:DEF QSW')
+        self.write('TRACE:DATA QSW, '+', '.join(wave))
+
 
 """
 === LIMITS ===
