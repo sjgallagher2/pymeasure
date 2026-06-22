@@ -67,17 +67,11 @@ class Keysight681xB(SCPIMixin, Instrument):
         validator=truncated_range,
         values=[0,300],
     )
-    voltage_trigger_mode = Instrument.control(
-        "VOLT:MODE?","VOLT:MODE %s",
-        """Control the voltage trigger mode. Can be FIXed|STEP|PULSe|LIST.""",
-        validator=strict_discrete_set,
-        values=['FIX','FIXED','STEP','PULS','PULSE','LIST']
-    )
-    voltage_trigger_level = Instrument.control(
-        "VOLT:TRIG?","VOLT:TRIG %f",
-        """Control the RMS output voltage on a trigger event.""",
+    clipped_sine_setpoint_pct = Instrument.control(
+        "FUNC:CSIN?","FUNC:CSIN %f",
+        """Control clipped sine clipping point as a percent (0-100) of peak amplitude.""",
         validator=truncated_range,
-        values=[0,300],
+        values=[0.,100.]
     )
     current_setpoint = Instrument.control(
         "CURRENT?","CURRENT %f",
@@ -90,6 +84,66 @@ class Keysight681xB(SCPIMixin, Instrument):
         """Control the frequency setpoint in hertz""",
         validator=truncated_range,
         values=[45,1000]
+    )
+    voltage_dc = Instrument.measurement(
+        "MEAS:VOLT:DC?",
+        """Measure DC voltage in volts."""
+    )
+    voltage_ac = Instrument.measurement(
+        "MEAS:VOLT:AC?",
+        """Measure AC RMS voltage in volts."""
+    )
+    voltage_acdc = Instrument.measurement(
+        "MEAS:VOLT:ACDC?",
+        """Measure ACDC voltage in volts."""
+    )
+    current_dc = Instrument.measurement(
+        "MEAS:CURR:DC?",
+        """Measure DC current in amperes."""
+    )
+    current_ac = Instrument.measurement(
+        "MEAS:CURR:AC?",
+        """Measure AC RMS current in amperes."""
+    )
+    current_acdc = Instrument.measurement(
+        "MEAS:CURR:ACDC?",
+        """Measure ACDC current in amperes."""
+    )
+    current_amplitude = Instrument.measurement(
+        "MEAS:CURR:AMPL:MAX?",
+        """Measure peak current amplitude in amperes."""
+    )
+    crest_factor = Instrument.measurement(
+        "MEAS:CURR:CRESTFACTOR?",
+        """Measure current crest factor."""
+    )
+    power_dc = Instrument.measurement(
+        "MEAS:POW:DC?",
+        """Measure DC power."""
+    )
+    power_real = Instrument.measurement(
+        "MEAS:POW:AC:REAL?",
+        """Measure AC real power in watts."""
+    )
+    power_apparent = Instrument.measurement(
+        "MEAS:POW:AC:APPARENT?",
+        """Measure AC apparent power in VA."""
+    )
+    power_reactive = Instrument.measurement(
+        "MEAS:POW:AC:REACTIVE?",
+        """Measure AC reactive power in VAR."""
+    )
+    power_total = Instrument.measurement(
+        "MEAS:POW:AC:TOTAL?",
+        """Measure three-phase total AC power."""
+    )
+    frequency = Instrument.measurement(
+        "MEAS:FREQUENCY?",
+        """Measure AC frequency in hertz."""
+    )
+    power_factor = Instrument.measurement(
+        "MEAS:POW:AC:PFACTOR?",
+        """Measure AC power factor in degrees."""
     )
     output_function = Instrument.control(
         "FUNC?","FUNC %s",
@@ -156,7 +210,6 @@ class Keysight681xB(SCPIMixin, Instrument):
         else:
             self.write('INIT:CONT:SEQ1 OFF')
 
-
     def send_GPIB_trigger(self):
         """Send a GPIB trigger signal. The trigger source must be set to BUS for this to have
         any effect. This function forces the trigger source to be BUS before sending."""
@@ -205,7 +258,12 @@ class Keysight681xB(SCPIMixin, Instrument):
         get_process_list=lambda names: [name.replace('"','') for name in names]
     )
     def get_user_wfm_data(self,name: str):
-        data_str = self.ask(f"TRACE:DATA? {name}")
+        """Get the data points for a particular user waveform.
+
+        :param name: internal name of user waveform.
+        :return: numpy array of y-data points with dtype float.
+        """
+        data_str = self.ask(f"TRACE:DATA? {name.upper()}")
         data = np.array(data_str.strip().split(','),dtype=float)
         return data
 
@@ -219,6 +277,14 @@ class Keysight681xB(SCPIMixin, Instrument):
                 namedata = self.get_user_wfm_data(name)
                 cat[name] = namedata
         return cat
+
+    def delete_user_waveform(self,name: str):
+        """Delete a user waveform by name."""
+        self.write(f'TRACE:DEL {name}')
+
+    def define_user_waveform_name(self,name: str):
+        """Define a user waveform name without data."""
+        self.write(f'TRACE:DEF {name}')
 
     def add_user_waveform(self,name,data1024,delete_existing=False):
         """Add a waveform called `name` with 1024 float data points in [0.0, 1.0] to the user
@@ -251,7 +317,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         if name in self.user_wfm_catalog:
             if delete_existing:
                 print(f"NOTE: Deleting existing waveform '{name}'")
-                self.write(f'TRACE:DEL {name}')  # Remove existing
+                self.delete_user_waveform(name)
             else:
                 raise ValueError("Waveform with this name already exists. To override, "\
                                  "use `delete_existing=True`.")
@@ -260,8 +326,8 @@ class Keysight681xB(SCPIMixin, Instrument):
         wave = [f'{x:.5f}' for x in data1024f]
 
         # Add name if needed, then write data
-        self.write('TRACE:DEF QSW')
-        self.write('TRACE:DATA QSW, '+', '.join(wave))
+        self.define_user_waveform_name(name)
+        self.write(f'TRACE:DATA {name}, '+', '.join(wave))
 
 
 """
@@ -275,7 +341,12 @@ class Keysight681xB(SCPIMixin, Instrument):
 -----------------------
 
 === SET POINT ===
-VOLT <V>
+# VOLT <V>
+# CURRENT <I>
+# FREQ <F>
+# FUNC SIN|SQU|CSIN|<user>
+# FUNC:CSIN <N>
+
 VOLT:TRIG <V>
 VOLT:MODE FIX|STEP|PULS|LIST
 VOLT:OFFSET <V>
@@ -296,22 +367,18 @@ VOLT:SLEW INFINITY
 VOLT:SLEW:MODE FIX|STEP|PULS|LIST
 VOLT:SLEW:TRIG <S>
 VOLT:SLEW:TRIG INFINITY
-CURRENT <I>
 CURR:PEAK <I>
 CURR:PEAK:MODE FIX|STEP|PULS|LIST
 CURR:TRIG <I>
 CURR:PROT:STATE OFF|ON
-FREQ <F>
 FREQ:MODE FIX|STEP|PULS|LIST
 FREQ:SLEW <S>
 FREQ:SLEW INFINITY
 FREQ:SLEW:MODE FIX|STEP|PULS|LIST
 FREQ:SLEW:TRIG <S>
 FREQ:TRIG <F>
-FUNC SIN|SQU|CSIN|<user>
 FUNC:MODE FIX|STEP|PULS|LIST
 FUNC:TRIG SIN|SQU|CSIN|<table>
-FUNC:CSIN <N>
 PHASE <P>
 PHASE:MODE FIX|STEP|PULS|LIST
 PHASE:TRIG <P>
@@ -328,18 +395,24 @@ OUTPUT:PROT:CLEAR
 OUTPUT:PROT:DELAY <t>
 
 === MEASUREMENTS ===
-MEAS:VOLT:DC?
-MEAS:VOLT:AC?
-MEAS:VOLT:ACDC?
+# MEAS:VOLT:DC?
+# MEAS:VOLT:AC?
+# MEAS:VOLT:ACDC?
+# MEAS:CURR:DC?
+# MEAS:CURR:AC?
+# MEAS:CURR:ACDC?
+# MEAS:CURR:AMPL:MAX?
+# MEAS:CURR:CRESTFACTOR?
+# MEAS:POW:DC?
+# MEAS:POW:AC:REAL?
+# MEAS:POW:AC:APPARENT?
+# MEAS:POW:AC:REACTIVE?
+# MEAS:POW:AC:PFACTOR?
+# MEAS:POW:AC:TOTAL?             3-phase total power
+# MEAS:FREQUENCY?
 MEAS:VOLT:HARMONIC:AMPL? <N>          for harmonic N
 MEAS:VOLT:HARMONIC:PHASE? <N>         for harmonic N
 MEAS:VOLT:HARMONIC:THD?
-MEAS:VOLT:
-MEAS:CURR:DC?
-MEAS:CURR:AC?
-MEAS:CURR:ACDC?
-MEAS:CURR:AMPL:MAX?
-MEAS:CURR:CRESTFACTOR?
 MEAS:CURR:HARMONIC:AMPL? <N>          for harmonic N
 MEAS:CURR:HARMONIC:PHASE? <N>         for harmonic N
 MEAS:CURR:HARMONIC:THD?
@@ -349,23 +422,10 @@ MEAS:CURR:NEUTRAL:
 MEAS:CURR:NEUTRAL:
 MEAS:CURR:NEUT:HARMONIC:AMPL? <N>     for harmonic N
 MEAS:CURR:NEUT:HARMONIC:PHASE? <N>    for harmonic N
-MEAS:POW:DC?
-MEAS:POW:AC:REAL?
-MEAS:POW:AC:APPARENT?
-MEAS:POW:AC:REACTIVE?
-MEAS:POW:AC:PFACTOR?
-MEAS:POW:AC:TOTAL?             3-phase total power
-MEAS:FREQUENCY?
 
 === SYSTEM ===
 SYSTEM:CONF NORM|IEC
 SYSTEM:ERROR?
-
-=== USER-DEFINED WAVEFORMS ===
-TRACE:CATALOG?
-TRACE <WAVEFORM> <N> {, <N>}
-TRACE:DEFINE <WAVEFORM>[, <WAVEFORM>|1024]
-TRACE:DELETE <WAVEFORM>
 
 === TRIGGERING ===
 ABORT
