@@ -111,7 +111,7 @@ class DHOScopeChannel(Channel):
         Valid range: 500 µV/div - 10 V/div for a 1x probe.
         """,
         validator=strict_range,
-        values=[500e-6, 10.0],
+        values=[500e-6, 100.0],
         cast=float,
     )
 
