@@ -172,6 +172,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         """,
         validator=strict_discrete_set,
         values=["BUS","EXT","EXTERNAL","IMM","IMMEDIATE"],
+        cast=str,
     )
     trigger_sync_source = Instrument.control(
         "TRIG:SYNC:SOUR?","TRIG:SYNC:SOUR %s",
@@ -183,6 +184,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         """,
         validator=strict_discrete_set,
         values=['IMM','IMMEDIATE','PHAS','PHASE'],
+        cast=str,
     )
     trigger_sync_phase = Instrument.control(
         "TRIG:SYNC:PHASE?","TRIG:SYNC:PHASE %f",
@@ -193,6 +195,19 @@ class Keysight681xB(SCPIMixin, Instrument):
         """,
         validator=truncated_range,
         values=[0,360],
+    )
+    voltage_trigger_level = Instrument.control(
+        "VOLT:TRIG?","VOLT:TRIG %f",
+        """Control the AC RMS amplitude of the output waveform when triggered.""",
+        validator=truncated_range,
+        values=[0,300],
+    )
+    voltage_trigger_mode = Instrument.control(
+        "VOLT:MODE?","VOLT:MODE %s",
+        """Control the voltage trigger mode""",
+        validator=strict_discrete_set,
+        values=["FIX","FIXED","STEP","PULS","PULSE","LIST"],
+        cast=str,
     )
     pulse_count = Instrument.control(
         "PULSE:COUNT?","PULSE:COUNT %f",
@@ -269,11 +284,11 @@ class Keysight681xB(SCPIMixin, Instrument):
         vset = self.voltage_setpoint
         self.voltage_setpoint = 0
         self.output_enable(True)
-        sleep(1)  # MUST dwell here for trigger to work.
         self.voltage_trigger_mode = 'STEP'
         self.voltage_trigger_level = vset
         self.trigger_sync_source = 'PHASE'
         self.trigger_sync_phase = trig_phase
+        sleep(1)  # MUST dwell here for trigger to work.
         self.arm_immediate_trigger()
         self.send_GPIB_trigger()
 
