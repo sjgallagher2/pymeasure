@@ -437,7 +437,7 @@ class DHOScope(SCPIMixin, Instrument):
 
     def clear_measurements(self):
         """Remove all displayed measurements."""
-        self.write(":MEAS:CLE:ALL")
+        self.write(":MEAS:CLE")
 
     # ================================================================== #
     #  CURSOR                                                             #
