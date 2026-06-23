@@ -23,7 +23,7 @@
 #
 
 from pymeasure.instruments import Instrument, SCPIUnknownMixin
-from pymeasure.instruments.validators import strict_discrete_set
+from pymeasure.instruments.validators import strict_discrete_set,truncated_range
 
 import logging
 log = logging.getLogger(__name__)
@@ -185,6 +185,42 @@ class HP33120A(SCPIUnknownMixin, Instrument):
         "BM:PHAS? MAX",
         """Get the maximum :attr:`~.HP33120A.burst_phase`"""
     )
+
+    trigger_source = Instrument.control(
+        "TRIG:SOUR?","TRIG:SOUR %s",
+        """Control the trigger source for triggered burst mode. Can be IMMediate|EXTernal|BUS.""",
+        validator=strict_discrete_set,
+        values=["IMM","IMMEDIATE","EXT","EXTERNAL","BUS"],
+        cast=str,
+    )
+
+    duty_cycle_pct = Instrument.control(
+        "PULSE:DCYCLE?","PULSE:DCYCLE %d",
+        """Controol the duty cycle as a percentage (20-80), for square waves only.""",
+        validator=truncated_range,
+        values=[20,80],
+        cast=int
+    )
+
+    def send_GPIB_trigger(self):
+        """Send a GPIB trigger to the waveform generator.
+
+        The trigger source is automatically changed to BUS.
+        """
+        self.trigger_source = "BUS"  # Verify GPIB trigger is selected
+        self.write("*TRG")
+
+    def trigger_pulse(self,Vpulse,pulse_width):
+        """Emit a single pulse from the waveform generator."""
+        self.shape = "square"
+        self.duty_cycle_pct = 50
+        self.amplitude = Vpulse
+        self.offset = Vpulse/2
+        self.frequency = 1/pulse_width/2
+        self.trigger_source = "BUS"
+        self.burst_enabled = True
+        self.burst_count = 1
+        self.send_GPIB_trigger()
 
     def beep(self):
         """ Causes a system beep. """
