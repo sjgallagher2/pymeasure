@@ -56,6 +56,7 @@ class Modes(StrEnum):
 class Keysight681xB(SCPIMixin, Instrument):
     """Represents the Keysight 6811B, 6812B, and 6813B AC Power Source/Analyzers."""
 
+    _BOOLS = {True: 1, False: 0}
 
     def __init__(self, adapter, name="Keysight 681xB AC Power Source/Analyzer",
                  **kwargs):
@@ -77,7 +78,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         "CURRENT?","CURRENT %f",
         """Control the AC RMS current limit setpoint in amperes.""",
         validator=truncated_range,
-        values=[0,13.0],  # limit for 6813B only
+        values=[0,13.0],  # default limit, for 6813B
     )
     frequency_setpoint = Instrument.control(
         "FREQ?","FREQ %f",
@@ -193,6 +194,31 @@ class Keysight681xB(SCPIMixin, Instrument):
         validator=truncated_range,
         values=[0,360],
     )
+    pulse_count = Instrument.control(
+        "PULSE:COUNT?","PULSE:COUNT %f",
+        """Control the number of pulses when trigger mode is set to PULSE.""",
+        validator=truncated_range,
+        values=[1,9.9E37],
+    )
+    pulse_period = Instrument.control(
+        "PULSE:PER?","PULSE:PER %f",
+        """Control pulse period in seconds when trigger mode is set to PULSE.""",
+        validator=truncated_range,
+        values=[0,4.30133E5],
+    )
+    pulse_duty_cycle_pct = Instrument.control(
+        "PULSE:DCYCLE?","PULSE:DCYCLE %f",
+        """Control pulse duty cycle as a percentage (0-100) when trigger mode is set to PULSE.""",
+        validator=truncated_range,
+        values=[0,100],
+    )
+    pulse_width = Instrument.control(
+        "PULSE:WIDTH?","PULSE:WIDTH %f",
+        """Control the width in seconds of a transient output pulse when trigger mode is set to
+        PULSE.""",
+        validator=truncated_range,
+        values=[0,4.30133E5],
+    )
 
     def arm_immediate_trigger(self):
         """Arm the trigger system (SEQ1). Before a trigger can have effect, the trigger subsystem
@@ -246,6 +272,55 @@ class Keysight681xB(SCPIMixin, Instrument):
         sleep(1)  # MUST dwell here for trigger to work.
         self.voltage_trigger_mode = 'STEP'
         self.voltage_trigger_level = vset
+        self.trigger_sync_source = 'PHASE'
+        self.trigger_sync_phase = trig_phase
+        self.arm_immediate_trigger()
+        self.send_GPIB_trigger()
+
+    def output_pulse(self,Vdefault,Vpulse,pulse_period,N_pulses=1,pulse_ON_time=-1):
+        """Trigger one or more voltage pulses.
+
+        :param N_pulses: number of pulses to output
+        :param Vdefault: default voltage, or pulse OFF state voltage
+        :param Vpulse: pulse ON state voltage
+        :param pulse_period: Time duration of one full pulse (an ON and an OFF duration)
+        :param pulse_ON_time: Time duration for pulse ON state, or -1 for a single pulse.
+        """
+        if pulse_ON_time == -1:
+            pulse_ON_time = pulse_period
+        self.voltage_setpoint = Vdefault
+        self.output_enable(True)
+        sleep(1)  # Dwell before trigger setup
+        self.voltage_trigger_mode = 'PULSE'
+        self.voltage_trigger_level = Vpulse
+        self.pulse_count = N_pulses
+        self.pulse_period = pulse_period
+        self.pulse_width = pulse_ON_time
+        self.arm_immediate_trigger()
+        self.send_GPIB_trigger()
+
+    def output_pulse_at_phase(self,Vdefault,Vpulse,pulse_period,trig_phase=0.,N_pulses=1,
+                              pulse_ON_time=-1):
+        """Trigger one or more voltage pulses, waiting for a particular phase angle before
+        triggering.
+
+        :param Vdefault: default voltage, or pulse OFF state voltage
+        :param Vpulse: pulse ON state voltage
+        :param pulse_period: Time duration of one full pulse (an ON and an OFF duration)
+        :param trig_phase: waveform phase angle at which to trigger
+        :param N_pulses: number of pulses to output
+        :param pulse_ON_time: Time duration for pulse ON state, or -1 for a single pulse.
+        """
+        if pulse_ON_time == -1:
+            pulse_ON_time = pulse_period
+        self.voltage_setpoint = Vdefault
+        self.output_enable(True)
+        sleep(1)  # Dwell before trigger setup
+        self.voltage_trigger_mode = "PULSE"
+        self.voltage_trigger_level = Vpulse
+        self.pulse_count = N_pulses
+        self.pulse_period = pulse_period
+        self.pulse_width = pulse_ON_time
         self.trigger_sync_source = 'PHASE'
         self.trigger_sync_phase = trig_phase
         self.arm_immediate_trigger()
@@ -384,7 +459,7 @@ PHASE:MODE FIX|STEP|PULS|LIST
 PHASE:TRIG <P>
 
 === OUTPUT ===
-OUTP:STATE OFF|ON
+# OUTP:STATE OFF|ON
 OUTPUT:COUPLING AC|DC
 OUTPUT:DFI:STATE OFF|ON
 OUTPUT:IMPEDANCE:STATE ON|OFF
