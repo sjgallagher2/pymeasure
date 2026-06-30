@@ -161,6 +161,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         validator=strict_discrete_set,
         values=_BOOLS,
         map_values=True,
+        cast=str,
     )
 
     trigger_source = Instrument.control(
