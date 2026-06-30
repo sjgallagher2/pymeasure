@@ -146,10 +146,11 @@ class Keysight681xB(SCPIMixin, Instrument):
         "MEAS:POW:AC:PFACTOR?",
         """Measure AC power factor in degrees."""
     )
-    output_function = Instrument.control(
+    waveform = Instrument.control(
         "FUNC?","FUNC %s",
         """Control the output function of the ac source. Can be SIN, SQU, CSIN, or a user
         waveform.""",
+        cast=str,
     )
     output_state = Instrument.control(
         "OUTPUT:STATE?","OUTPUT:STATE %s",
@@ -315,9 +316,12 @@ class Keysight681xB(SCPIMixin, Instrument):
         self.send_GPIB_trigger()
 
     def output_pulse_at_phase(self,Vdefault,Vpulse,pulse_period,trig_phase=0.,N_pulses=1,
-                              pulse_ON_time=-1):
+                              pulse_ON_time=-1,trigger_source="GPIB"):
         """Trigger one or more voltage pulses, waiting for a particular phase angle before
         triggering.
+
+        If trigger source is GPIB, trigger is sent immediately. if trigger source is
+        external, this function returns with the system armed for an external trigger.
 
         :param Vdefault: default voltage, or pulse OFF state voltage
         :param Vpulse: pulse ON state voltage
@@ -325,6 +329,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         :param trig_phase: waveform phase angle at which to trigger
         :param N_pulses: number of pulses to output
         :param pulse_ON_time: Time duration for pulse ON state, or -1 for a single pulse.
+        :param trigger_source: Trigger source, can be GPIB|BUS|EXTernal|IMMediate.
         """
         if pulse_ON_time == -1:
             pulse_ON_time = pulse_period
@@ -339,7 +344,10 @@ class Keysight681xB(SCPIMixin, Instrument):
         self.trigger_sync_source = 'PHASE'
         self.trigger_sync_phase = trig_phase
         self.arm_immediate_trigger()
-        self.send_GPIB_trigger()
+        if trigger_source == "GPIB" or trigger_source == "BUS":
+            self.send_GPIB_trigger()
+        else:
+            self.trigger_source = trigger_source
 
     # WAVEFORMS #
     user_wfm_catalog = Instrument.measurement(
@@ -420,118 +428,5 @@ class Keysight681xB(SCPIMixin, Instrument):
         self.write(f'TRACE:DATA {name}, '+', '.join(wave))
 
 
-"""
-=== LIMITS ===
-300Vrms max
-13Arms max (6813B)
-1350W max (6813B
-+/- 425VDC max
-10ADC max (6813B)
-45Hz-1kHz frequency
------------------------
-
-=== SET POINT ===
-# VOLT <V>
-# CURRENT <I>
-# FREQ <F>
-# FUNC SIN|SQU|CSIN|<user>
-# FUNC:CSIN <N>
-
-VOLT:TRIG <V>
-VOLT:MODE FIX|STEP|PULS|LIST
-VOLT:OFFSET <V>
-VOLT:OFFSET:MODE FIX|STEP|PULS|LIST
-VOLT:OFFSET:TRIG <V>
-VOLT:OFFSET:SLEW <S>
-VOLT:OFFSET:SLEW INFINITY
-VOLT:OFFSET:SLEW:MODE FIX|STEP|PULSE|LIST
-VOLT:OFFSET:SLEW:TRIG <S>
-VOLT:OFFSET:SLEW:TRIG INFINITY
-VOLT:PROT <V>
-VOLT:PROT:STATE OFF|ON
-VOLT:RANGE <V>
-VOLT:SENSE:DETECTOR RTIME|RMS
-VOLT:SENSE:SOURCE INTERNAL|EXTERNAL
-VOLT:SLEW <S>
-VOLT:SLEW INFINITY
-VOLT:SLEW:MODE FIX|STEP|PULS|LIST
-VOLT:SLEW:TRIG <S>
-VOLT:SLEW:TRIG INFINITY
-CURR:PEAK <I>
-CURR:PEAK:MODE FIX|STEP|PULS|LIST
-CURR:TRIG <I>
-CURR:PROT:STATE OFF|ON
-FREQ:MODE FIX|STEP|PULS|LIST
-FREQ:SLEW <S>
-FREQ:SLEW INFINITY
-FREQ:SLEW:MODE FIX|STEP|PULS|LIST
-FREQ:SLEW:TRIG <S>
-FREQ:TRIG <F>
-FUNC:MODE FIX|STEP|PULS|LIST
-FUNC:TRIG SIN|SQU|CSIN|<table>
-PHASE <P>
-PHASE:MODE FIX|STEP|PULS|LIST
-PHASE:TRIG <P>
-
-=== OUTPUT ===
-# OUTP:STATE OFF|ON
-OUTPUT:COUPLING AC|DC
-OUTPUT:DFI:STATE OFF|ON
-OUTPUT:IMPEDANCE:STATE ON|OFF
-OUTPUT:IMPEDANCE:REAL <R>
-OUTPUT:IMPEDANCE:REACTIVE <X>
-OUTPUT:PON:STATE RST|RCL0
-OUTPUT:PROT:CLEAR
-OUTPUT:PROT:DELAY <t>
-
-=== MEASUREMENTS ===
-# MEAS:VOLT:DC?
-# MEAS:VOLT:AC?
-# MEAS:VOLT:ACDC?
-# MEAS:CURR:DC?
-# MEAS:CURR:AC?
-# MEAS:CURR:ACDC?
-# MEAS:CURR:AMPL:MAX?
-# MEAS:CURR:CRESTFACTOR?
-# MEAS:POW:DC?
-# MEAS:POW:AC:REAL?
-# MEAS:POW:AC:APPARENT?
-# MEAS:POW:AC:REACTIVE?
-# MEAS:POW:AC:PFACTOR?
-# MEAS:POW:AC:TOTAL?             3-phase total power
-# MEAS:FREQUENCY?
-MEAS:VOLT:HARMONIC:AMPL? <N>          for harmonic N
-MEAS:VOLT:HARMONIC:PHASE? <N>         for harmonic N
-MEAS:VOLT:HARMONIC:THD?
-MEAS:CURR:HARMONIC:AMPL? <N>          for harmonic N
-MEAS:CURR:HARMONIC:PHASE? <N>         for harmonic N
-MEAS:CURR:HARMONIC:THD?
-MEAS:CURR:NEUTRAL:DC?
-MEAS:CURR:NEUTRAL:
-MEAS:CURR:NEUTRAL:
-MEAS:CURR:NEUTRAL:
-MEAS:CURR:NEUT:HARMONIC:AMPL? <N>     for harmonic N
-MEAS:CURR:NEUT:HARMONIC:PHASE? <N>    for harmonic N
-
-=== SYSTEM ===
-SYSTEM:CONF NORM|IEC
-SYSTEM:ERROR?
-
-=== TRIGGERING ===
-ABORT
-INIT
-INIT:SEQ1|SEQ2|SEQ3
-INIT:NAME TRAN|ACQ
-INIT:CONTINUOUS:SEQ[1] OFF|ON
-INIT:CONTINUOUS:NAME TRAN OFF|ON
-TRIG
-TRIG:SYNC:SOURCE PHASE|IMMEDIATE
-TRIG:SYNC:PHASE <P>
-TRIG:ACQ
-TRIG:ACQ:SOURCE BUS|EXT|TTLT
-TRIG:SEQ1:DEFINE TRANSIENT
-TRIG:SEQ2:DEFINE SYNCHRONIZE
-TRIG:SEQ3:DEFINE ACQUIRE
-"""
 
 
