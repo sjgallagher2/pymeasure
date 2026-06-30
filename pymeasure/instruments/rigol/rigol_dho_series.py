@@ -92,6 +92,7 @@ class DHOScopeChannel(Channel):
         """Control the input coupling: ``"AC"``, ``"DC"``, or ``"GND"``.""",
         validator=strict_discrete_set,
         values=["AC", "DC", "GND"],
+        cast=str,
     )
 
     bandwidth_limit = Channel.control(
@@ -101,6 +102,7 @@ class DHOScopeChannel(Channel):
         ``"100M"``.""",
         validator=strict_discrete_set,
         values=["OFF", "20M", "100M"],
+        cast=str,
     )
 
     scale = Channel.control(
@@ -150,6 +152,7 @@ class DHOScopeChannel(Channel):
         ``"AMP"``, or ``"UNKN"``.""",
         validator=strict_discrete_set,
         values=["VOLT", "WATT", "AMP", "UNKN"],
+        cast=str,
     )
 
     label = Channel.control(
@@ -225,6 +228,7 @@ class DHOScope(SCPIMixin, Instrument):
         """,
         validator=strict_discrete_set,
         values=["NORM", "AVER", "PEAK", "ULTR"],
+        cast=str,
     )
 
     acquisition_averages = Instrument.control(
@@ -295,6 +299,7 @@ class DHOScope(SCPIMixin, Instrument):
         """Control the timebase mode: ``"MAIN"``, ``"XY"``, or ``"ROLL"``.""",
         validator=strict_discrete_set,
         values=["MAIN", "XY", "ROLL"],
+        cast=str,
     )
 
     # ================================================================== #
@@ -328,6 +333,7 @@ class DHOScope(SCPIMixin, Instrument):
             "CAN",
             "LIN",
         ],
+        cast=str,
     )
 
     trigger_sweep = Instrument.control(
@@ -337,6 +343,7 @@ class DHOScope(SCPIMixin, Instrument):
         or ``"SING"``.""",
         validator=strict_discrete_set,
         values=["AUTO", "NORM", "SING"],
+        cast=str,
     )
 
     trigger_source = Instrument.control(
@@ -346,6 +353,7 @@ class DHOScope(SCPIMixin, Instrument):
         ``"AC"``, or ``"EXT"``.""",
         validator=strict_discrete_set,
         values=(["CHAN1", "CHAN2", "CHAN3", "CHAN4", "AC", "EXT"]),
+        cast=str,
     )
 
     trigger_slope = Instrument.control(
@@ -355,6 +363,7 @@ class DHOScope(SCPIMixin, Instrument):
         (falling), or ``"RFAL"`` (either).""",
         validator=strict_discrete_set,
         values=["POS", "NEG", "RFAL"],
+        cast=str,
     )
 
     trigger_level = Instrument.control(
@@ -371,6 +380,7 @@ class DHOScope(SCPIMixin, Instrument):
         or ``"HFR"``.""",
         validator=strict_discrete_set,
         values=["AC", "DC", "LFR", "HFR"],
+        cast=str,
     )
 
     trigger_holdoff = Instrument.control(
@@ -388,6 +398,14 @@ class DHOScope(SCPIMixin, Instrument):
         ``"STOP"``.
         """
         return self.ask(":TRIG:STAT?").strip()
+
+    timebase_roll = Instrument.control(
+        ":TIMEBASE:ROLL?",":TIMEBASE:ROLL %d",
+        """Control the status of the ROLL mode (bool).""",
+        validator=strict_discrete_set,
+        values={True: 1, False: 0},
+        map_values=True,
+    )
 
     # ================================================================== #
     #  RUN CONTROL                                                        #
@@ -450,6 +468,7 @@ class DHOScope(SCPIMixin, Instrument):
         or ``"XY"``.""",
         validator=strict_discrete_set,
         values=["OFF", "MAN", "TRAC", "XY"],
+        cast=str,
     )
 
     # ================================================================== #
@@ -477,6 +496,7 @@ class DHOScope(SCPIMixin, Instrument):
         ``"1"``, ``"5"``, ``"10"``, or ``"INF"``.""",
         validator=strict_discrete_set,
         values=["MIN", "0.1", "0.5", "1", "5", "10", "INF"],
+        cast=str,
     )
 
     # ================================================================== #
