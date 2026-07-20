@@ -103,52 +103,6 @@ class Instrument(CommonBase):
         self.shutdown()
         return None
 
-    # SCPI default properties
-    @property
-    def complete(self):
-        """Get the synchronization bit.
-
-        This property allows synchronization between a controller and a device. The Operation
-        Complete query places an ASCII character 1 into the device's Output Queue when all pending
-        selected device operations have been finished.
-        """
-        if self.SCPI:
-            return self.ask("*OPC?").strip()
-        else:
-            raise NotImplementedError("Non SCPI instruments require implementation in subclasses")
-
-    @property
-    def status(self):
-        """ Get the status byte and Master Summary Status bit. """
-        if self.SCPI:
-            return self.ask("*STB?").strip()
-        else:
-            raise NotImplementedError("Non SCPI instruments require implementation in subclasses")
-
-    @property
-    def options(self):
-        """ Get the device options installed. """
-        if self.SCPI:
-            return self.ask("*OPT?").strip()
-        else:
-            raise NotImplementedError("Non SCPI instruments require implementation in subclasses")
-
-    @property
-    def id(self):
-        """ Get the identification of the instrument. """
-        if self.SCPI:
-            return self.ask("*IDN?").strip()
-        else:
-            raise NotImplementedError("Non SCPI instruments require implementation in subclasses")
-
-    @property
-    def next_error(self):
-        """Get the next error of the instrument (tuple of code and message)."""
-        if self.SCPI:
-            return self.values("SYST:ERR?", cast=cast_or_str(float))
-        else:
-            raise NotImplementedError("Non SCPI instruments require implementation in subclasses")
-
     # Wrapper functions for the Adapter object
     def write(self, command: str, **kwargs) -> None:
         """Write a string command to the instrument appending `write_termination`.
