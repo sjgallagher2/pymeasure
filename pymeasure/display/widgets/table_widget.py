@@ -474,7 +474,8 @@ class Table(QtWidgets.QTableView):
 
     def __init__(self, refresh_time=0.2, check_status=True,
                  force_reload=False, layout_class=PandasModelByColumn,
-                 column_index=None, float_digits=6, parent=None):
+                 column_index=None, float_digits=6, parent=None,
+                 show_cols=[]):
         super().__init__(parent)
         self.force_reload = force_reload
         self.float_digits = float_digits
@@ -496,6 +497,7 @@ class Table(QtWidgets.QTableView):
             self.timer = QtCore.QTimer(self)
             self.timer.timeout.connect(self.update_tables)
             self.timer.start(int(self.refresh_time * 1e3))
+        self.show_cols = show_cols
 
     def setModel(self, model):
         model.float_digits = self.float_digits
@@ -564,6 +566,14 @@ class Table(QtWidgets.QTableView):
             else:
                 if item.results.procedure.status == Procedure.RUNNING:
                     item.update_data()
+
+        # Hide no-show columns
+        col_labels = []
+        for x in range(model.columnCount()):
+            col_labels.append(model.headerData(x,QtCore.Qt.Orientation.Horizontal,QtCore.Qt.ItemDataRole.DisplayRole))
+        for i in range(len(col_labels)):
+            if col_labels[i] not in self.show_cols:
+                self.hideColumn(i)
 
     def set_color(self, table, color):
         table.set_color(color)
@@ -654,6 +664,7 @@ class TableWidget(TabWidget, QtWidgets.QWidget):
                            column_index=self.column_index,
                            float_digits=self.float_digits,
                            parent=self,
+                           show_cols=self.columns
                            )
 
     def _layout(self):
