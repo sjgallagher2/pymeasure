@@ -29,7 +29,7 @@ import time
 from decimal import Decimal
 import numpy as np
 
-from pymeasure.instruments import Instrument, Channel, SCPIMixin
+from pymeasure.instruments import Instrument, Channel, SCPIUnknownMixin, cast_or_str
 from pymeasure.instruments.validators import strict_discrete_set, strict_range, \
     strict_discrete_range
 
