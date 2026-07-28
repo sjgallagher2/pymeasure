@@ -354,7 +354,7 @@ class Keysight681xB(SCPIMixin, Instrument):
     user_wfm_catalog = Instrument.measurement(
         "TRACE:CATALOG?",
         """Get the user waveform catalog.""",
-        get_process_list=lambda names: [name.replace('"', "") for name in names],
+        get_process_list=lambda names: [str(name).replace('"', "") for name in names],
     )
 
     def get_user_wfm_data(self, name: str):
