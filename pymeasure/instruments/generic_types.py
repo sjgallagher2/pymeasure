@@ -26,6 +26,7 @@ import logging
 from warnings import warn
 
 from .instrument import Instrument
+from .common_base import cast_or_str
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -35,7 +36,6 @@ class SCPIMixin:
     """Mixin class for SCPI instruments with the default implementation of base SCPI commands."""
 
     def __init__(self, *args, **kwargs):
-        kwargs.setdefault("includeSCPI", False)  # in order not to trigger the deprecation warning
         super().__init__(*args, **kwargs)
 
     # SCPI default properties
@@ -74,6 +74,7 @@ class SCPIMixin:
         """Get the next error in the queue.
         If you want to read and log all errors, use :meth:`check_errors` instead.
         """,
+        cast=cast_or_str(float),
     )
 
     # SCPI default methods
