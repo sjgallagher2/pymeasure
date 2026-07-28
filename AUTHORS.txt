@@ -107,7 +107,12 @@ Alfons Schuck
 Lucas Braud
 Patrick Mischke
 Sung-Chieh Chiu
+Joan Solé
+Wiktor Jankowski
 Przemysław Piróg
+Niklas Schulz
 Haotian Zhang
 Maduka Ariyasiri
 Sam Gallagher
+Max Tweedale
+Muralidhar M Shenoy

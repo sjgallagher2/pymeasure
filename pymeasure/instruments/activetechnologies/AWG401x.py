@@ -27,13 +27,11 @@ for the Arbitrary Waveform Generator (AWG) mode and the Arbitrary Function
 Generator (AFG) mode. The module has been developed from the official
 documentation available on https://www.activetechnologies.it"""
 
+import pprint
 from collections import abc, namedtuple
 
-import pprint
-
-from pymeasure.instruments import Instrument, Channel, SCPIUnknownMixin
-from pymeasure.instruments.validators import strict_discrete_set, \
-    strict_range
+from pymeasure.instruments import Channel, Instrument, SCPIUnknownMixin
+from pymeasure.instruments.validators import strict_discrete_set, strict_range
 
 
 class ChannelBase(Channel):
@@ -114,7 +112,7 @@ class ChannelAFG(ChannelBase):
     shape = Instrument.control(
         "SOURce{ch}:FUNCtion:SHAPe?", "SOURce{ch}:FUNCtion:SHAPe %s",
         """Control the shape of the carrier waveform.
-        Allowed choices depends on the choosen modality, please refer on
+        Allowed choices depends on the chosen modality, please refer on
         instrument manual. When you set this property with a different value,
         if the instrument is running it will be stopped.
         Can be set to: SIN<USOID>, SQU<ARE>, PULS<E>, RAMP, PRN<OISE>, DC,
@@ -670,7 +668,7 @@ class AWG401x_AWG(AWG401x_base):
         values, delete them or create new waveforms""")
 
     def trigger(self):
-        """Force a trigger event to occour."""
+        """Force a trigger event to occur."""
         self.write("TRIGger:SEQuence:IMMediate")
 
     def save_file(self,
@@ -786,14 +784,12 @@ class AWG401x_AWG(AWG401x_base):
             self.parent.remove_file(f"{key}.txt")
 
             self._data[key] = None
-            return
 
         def __delitem__(self, key):
             """When removing an element this method removes also the
             corresponding waveform in the instrument"""
             del self._data[key]
             self.parent.write(f'WLISt:WAVeform:DELete "{key}"')
-            return
 
         def __iter__(self):
             try:

@@ -29,7 +29,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from pymeasure import instruments
-from pymeasure.instruments import Instrument, Channel, generic_types
+from pymeasure.instruments import Channel, Instrument, generic_types
 
 
 # Collect all instruments
@@ -166,7 +166,7 @@ def test_name_argument(cls):
 
 # This uses a pyvisa-sim default instrument, we could also define our own.
 SIM_RESOURCE = "ASRL2::INSTR"
-is_pyvisa_sim_not_installed = not bool(importlib.util.find_spec("pyvisa_sim")) # type: ignore
+is_pyvisa_sim_not_installed = not bool(importlib.util.find_spec("pyvisa_sim"))  # type: ignore
 
 
 @pytest.mark.skipif(
@@ -202,7 +202,7 @@ def test_includeSCPI_not_set_to_True(cls):
 
 def property_name_to_id(value):
     """Create a test id from `value`."""
-    device, property_name, prop = value
+    device, property_name, _prop = value
     return f"{device.__name__}.{property_name}"
 
 

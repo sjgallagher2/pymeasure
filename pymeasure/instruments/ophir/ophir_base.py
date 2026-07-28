@@ -22,16 +22,14 @@
 # THE SOFTWARE.
 #
 
-from enum import Enum, IntFlag, IntEnum
-
-from typing import Any, TypedDict, TypeVar
 from collections.abc import Callable, Sequence
+from enum import Enum, IntEnum, IntFlag
+from typing import Any, TypedDict, TypeVar
 
 from pymeasure.adapters import Adapter
-from pymeasure.instruments.common_base import CommonBase, cast_or_str
 from pymeasure.instruments import Instrument
-from pymeasure.instruments.validators import strict_range, strict_discrete_set
-
+from pymeasure.instruments.common_base import CommonBase, cast_or_str
+from pymeasure.instruments.validators import strict_discrete_set, strict_range
 
 T = TypeVar("T")
 
@@ -123,7 +121,7 @@ class OphirCommunication(Instrument):
         try:
             from pyvisa.constants import InterfaceType
 
-            info = self.adapter.connection.resource_info(self.adapter.resource_name) # type: ignore
+            info = self.adapter.connection.resource_info(self.adapter.resource_name)  # type: ignore
             self._is_rs232 = info.interface_type == InterfaceType.asrl
         except (AttributeError, TypeError):
             self._is_rs232 = False
@@ -361,7 +359,7 @@ class OphirBase(OphirCommunication):
     ) -> tuple[tuple[float, float] | None, Sequence[float | str | None]]:
         """Get wavelength limits for continuous sensor and wavelength list."""
         values = self.values("AW", cast=str)  # All Wavelengths
-        current, limits, entries = self._extract_wavelengths(values)
+        _current, limits, entries = self._extract_wavelengths(values)
         return limits, entries
 
     wavelength = Instrument.control(

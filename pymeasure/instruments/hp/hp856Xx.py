@@ -23,30 +23,24 @@
 #
 
 import logging
-from math import log10
-from enum import Enum, IntFlag
 from datetime import datetime
+from enum import IntFlag
+from math import log10
 
 import numpy as np
 
 from pymeasure.instruments import Instrument
+from pymeasure.instruments._strenum import StrEnum
 from pymeasure.instruments.common_base import cast_or_str
-from pymeasure.instruments.validators import strict_discrete_set, truncated_discrete_set, \
-    joined_validators, strict_range
+from pymeasure.instruments.validators import (
+    joined_validators,
+    strict_discrete_set,
+    strict_range,
+    truncated_discrete_set,
+)
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
-
-
-try:
-    from enum import StrEnum
-except ImportError:
-    class StrEnum(str, Enum):
-        """Until StrEnum is broadly available / pymeasure relies on python <=
-        3.10.x."""
-
-        def __str__(self):
-            return self.value
 
 
 class WindowType(StrEnum):
@@ -476,7 +470,7 @@ class ErrorCode:
         529: ("RBW <303", "Unable to adjust <300 Hz resolution bandwidths"),
         530: ("RBW <304", "Unable to adjust <300 Hz resolution bandwidths"),
         531: (
-            "RBW <305", "Unable to adjust gain versus frequency for resoultion bandwidths <300 Hz"),
+            "RBW <305", "Unable to adjust gain versus frequency for resolution bandwidths <300 Hz"),
         532: ("RBW <306", "Absolute gain data for resolution bandwidths <300 Hz not acceptable"),
         533: ("RBW <307", "Unable to adjust <300 Hz resolution bandwidths"),
         534: ("RBW <308", "Unable to adjust frequency accuracy for resolution bandwidths <100 Hz"),
@@ -556,8 +550,8 @@ class ErrorCode:
         755: ("SYSTEM", "Hardware/firmware interaction; check other errors"),
         900: ("TG UNLVL", "Tracking generator output is unleveled"),
         901: ("TGFrqLmt",
-              "Tracking generator output unleveled because START FREQ is set "
-              "below tracking generator frequency limit (300 kHz)"),
+              ("Tracking generator output unleveled because START FREQ is set "
+              "below tracking generator frequency limit (300 kHz)")),
         902: ("BAD NORM",
               "The state of the stored trace does not match the current state of the analyzer"),
         903: ("&> DLMT", "Unnormalized trace A is off-screen with trace math or normalization on"),
@@ -575,13 +569,13 @@ class ErrorCode:
         :param code: Representing an error as id or short description
         :type code: str, int
         """
-        if not (isinstance(code, int) or isinstance(code, str)):
+        if not (isinstance(code, (int, str))):
             print(type(code))
             raise TypeError("Initialziation type for code must be integer or string")
 
         try:
             self.code = int(code)
-            if self.code not in self.__error_code_list.keys():
+            if self.code not in self.__error_code_list:
                 raise ValueError()
 
         except (ValueError, TypeError):
@@ -2138,14 +2132,14 @@ class HP856Xx(Instrument):
             instr.preset()
             instr.recall_state(7)
         """
-        values = ["LAST", "PWRON"] + [str(f) for f in range(0, 9)]
-        if not (isinstance(inp, str) or isinstance(inp, int)):
+        values = ["LAST", "PWRON"] + [str(f) for f in range(9)]
+        if not (isinstance(inp, (str, int))):
             raise TypeError(f"Should be of type 'str' or 'int' but is '{type(inp)}'")
 
         if str(inp) not in values:
-            raise ValueError(f"Only accepts values of [{values}] but was '{str(inp)}'")
+            raise ValueError(f"Only accepts values of [{values}] but was '{inp!s}'")
 
-        self.write(f"RCLS {str(inp)}")
+        self.write(f"RCLS {inp!s}")
 
     def recall_trace(self, trace, number):
         """Recalls previously saved trace data to the display. See
@@ -2169,7 +2163,7 @@ class HP856Xx(Instrument):
             # reload - at 7 stored trace - to Trace B
             instr.recall_trace(Trace.B, 7)
         """
-        ran = range(0, 7)
+        ran = range(7)
         if not isinstance(trace, str):
             raise TypeError(f"Should be of type str but is '{type(trace)}'")
 
@@ -2220,7 +2214,7 @@ class HP856Xx(Instrument):
     reference_level_calibration = Instrument.control(
         "RLCAL?", "RLCAL %g",
         """
-        Control the calibration of the reference level remotely and retuns the
+        Control the calibration of the reference level remotely and return the
         current calibration. To calibrate the reference level, connect the 300 MHz calibration
         signal to the RF input. Set the center frequency to 300 MHz, the frequency span to 20
         MHz, and the reference level to -10 dBm. Use the RLCAL command to move the input signal
@@ -2296,14 +2290,14 @@ class HP856Xx(Instrument):
             instr.span = 20e6
             instr.save_state("PWRON")
         """
-        values = ["PWRON"] + [str(f) for f in range(0, 9)]
-        if not (isinstance(inp, str) or isinstance(inp, int)):
+        values = ["PWRON"] + [str(f) for f in range(9)]
+        if not (isinstance(inp, (str, int))):
             raise TypeError(f"Should be of type 'str' or 'int' but is '{type(inp)}'")
 
         if str(inp) not in values:
-            raise ValueError(f"Only accepts values of [{values}] but was '{str(inp)}'")
+            raise ValueError(f"Only accepts values of [{values}] but was '{inp!s}'")
 
-        self.write(f"SAVES {str(inp)}")
+        self.write(f"SAVES {inp!s}")
 
     def save_trace(self, trace, number):
         """Saves the selected trace in the specified trace register.
@@ -2326,7 +2320,7 @@ class HP856Xx(Instrument):
             # reload - at 7 stored trace - to Trace B
             instr.recall_trace(Trace.B, 7)
         """
-        ran = range(0, 7)
+        ran = range(7)
         if not isinstance(trace, str):
             raise TypeError(f"Should be of type str but is '{type(trace)}'")
 
@@ -2371,7 +2365,6 @@ class HP856Xx(Instrument):
         values=[["FULL", "ZERO"], [float("-inf"), float("inf")]],
         cast=cast_or_str(float),
         set_process=lambda v: v if isinstance(v, str) else f"{v:.11E} Hz",
-        get_process=lambda v: v if isinstance(v, str) else v,
     )
 
     squelch = Instrument.control(
@@ -2421,12 +2414,12 @@ class HP856Xx(Instrument):
         :param input: Bits to emulate a service request
         :type input: :class:`StatusRegister`
         """
-        if input not in range(0, 255):
+        if input not in range(255):
             raise ValueError("Bit mask needs to be between 0 ... 255")
 
         self.write(f"SRQ {input}")
 
-    # `center_frequency_step_size` would be a command but is pretty unnecesary
+    # `center_frequency_step_size` would be a command but is pretty unnecessary
 
     sweep_time = Instrument.control(
         "ST?", "ST %s",
@@ -3167,7 +3160,7 @@ class HP8561B(HP856Xx):
         if not isinstance(band, str):
             raise TypeError(f"Frequency band should be of type string but is '{type(band)}'")
 
-        if band not in frequency_mapping.keys():
+        if band not in frequency_mapping:
             raise ValueError(f"Should be one of the available bands but is '{band}'")
 
         self.center_frequency_values = frequency_mapping[band]

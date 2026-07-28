@@ -116,7 +116,7 @@ class SQM160(Instrument):
                          name,
                          write_termination="",
                          read_termination="",
-                         asrl=dict(baud_rate=baud_rate),
+                         asrl={"baud_rate": baud_rate},
                          timeout=3000,
                          **kwargs)
 
@@ -195,7 +195,7 @@ class SQM160(Instrument):
         "W", """Get the current rate (Angstrom/s), Thickness (Angstrom), and frequency (Hz)
                 for each sensor""",
         cast=float,
-        preprocess_reply=lambda msg: msg[5:],  # ingore first '00.00'
+        preprocess_reply=lambda msg: msg[5:],  # ignore first '00.00'
     )
 
     reset_flag = Instrument.measurement(
