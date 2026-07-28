@@ -52,7 +52,7 @@ class Keysight681xB(SCPIMixin, Instrument):
     Do not use this class directly; use one of its subclasses.
     """
 
-    _BOOLS = {True: 1, False: 0}
+    _BOOLS = {True: '1', False: '0'}
     FREQ_RANGE = [45, 1000]
     ROUT_RANGE = [0, 1]
     LOUT_RANGE = [20e-6, 1e-3]  # Henries
@@ -373,7 +373,8 @@ class Keysight681xB(SCPIMixin, Instrument):
     user_wfm_catalog = Instrument.measurement(
         "TRACE:CATALOG?",
         """Get the user waveform catalog.""",
-        get_process_list=lambda names: [str(name).replace('"', "") for name in names],
+        get_process_list=lambda names: [name.replace('"', "") for name in names],
+        cast=str,
     )
 
     def get_user_wfm_data(self, name: str):
