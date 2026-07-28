@@ -47,9 +47,15 @@ class Modes(StrEnum):
 
 
 class Keysight681xB(SCPIMixin, Instrument):
-    """Represents the Keysight 6811B, 6812B, and 6813B AC Power Source/Analyzers."""
+    """Represents the Keysight 681xB series of AC Power Source/Analyzers.
+
+    Do not use this class directly; use one of its subclasses.
+    """
 
     _BOOLS = {True: 1, False: 0}
+    FREQ_RANGE = [45, 1000]
+    ROUT_RANGE = [0, 1]
+    LOUT_RANGE = [20e-6, 1e-3]  # Henries
 
     def __init__(self, adapter, name="Keysight 681xB AC Power Source/Analyzer", **kwargs):
         super().__init__(adapter, name, **kwargs)
@@ -59,7 +65,8 @@ class Keysight681xB(SCPIMixin, Instrument):
         "VOLT %f",
         """Control the AC RMS voltage amplitude setpoint in volts.""",
         validator=strict_range,
-        values=[0, 300],
+        values=[0, 1],
+        dynamic=True,
     )
     clipped_sine_setpoint_pct = Instrument.control(
         "FUNC:CSIN?",
@@ -73,14 +80,15 @@ class Keysight681xB(SCPIMixin, Instrument):
         "CURRENT %f",
         """Control the AC RMS current limit setpoint in amperes.""",
         validator=strict_range,
-        values=[0, 13.0],  # default limit, for 6813B
+        values=[0, 1],
+        dynamic=True,
     )
     frequency_setpoint = Instrument.control(
         "FREQ?",
         "FREQ %f",
         """Control the frequency setpoint in hertz""",
         validator=strict_range,
-        values=[45, 1000],
+        values=FREQ_RANGE,
     )
     voltage_dc = Instrument.measurement("MEAS:VOLT:DC?", """Measure DC voltage in volts.""")
     voltage_ac = Instrument.measurement("MEAS:VOLT:AC?", """Measure AC RMS voltage in volts.""")
@@ -171,7 +179,8 @@ class Keysight681xB(SCPIMixin, Instrument):
         "VOLT:TRIG %f",
         """Control the AC RMS amplitude of the output waveform when triggered.""",
         validator=strict_range,
-        values=[0, 300],
+        values=[0, 1],
+        dynamic=True,
     )
     voltage_trigger_mode = Instrument.control(
         "VOLT:MODE?",
@@ -422,3 +431,43 @@ class Keysight681xB(SCPIMixin, Instrument):
         # Add name if needed, then write data
         self.define_user_waveform_name(name)
         self.write(f"TRACE:DATA {name}, " + ", ".join(wave))
+
+
+class Keysight6811B(Keysight681xB):
+    VRMS_MAX = 300
+    IRMS_MAX = 3.25
+    VPEAK_MAX = 425
+    IPEAK_MAX = 40
+
+    def __init__(self, adapter, name="Keysight 6811B AC Power Source/Analyzer", **kwargs):
+        super().__init__(adapter, name, **kwargs)
+        self.voltage_setpoint_values = [0, self.VRMS_MAX]
+        self.current_setpoint_values = [0, self.IRMS_MAX]
+        self.voltage_trigger_level_values = [0, self.VRMS_MAX]
+
+
+class Keysight6812B(Keysight681xB):
+    VRMS_MAX = 300
+    IRMS_MAX = 6.5
+    VPEAK_MAX = 425
+    IPEAK_MAX = 40
+
+    def __init__(self, adapter, name="Keysight 6812B AC Power Source/Analyzer", **kwargs):
+        super().__init__(adapter, name, **kwargs)
+        self.voltage_setpoint_values = [0, self.VRMS_MAX]
+        self.current_setpoint_values = [0, self.IRMS_MAX]
+        self.voltage_trigger_level_values = [0, self.VRMS_MAX]
+
+
+class Keysight6813B(Keysight681xB):
+    VRMS_MAX = 300
+    IRMS_MAX = 13
+    VPEAK_MAX = 425
+    IPEAK_MAX = 80
+
+    def __init__(self, adapter, name="Keysight 6813B AC Power Source/Analyzer", **kwargs):
+        super().__init__(adapter, name, **kwargs)
+        self.voltage_setpoint_values = [0, self.VRMS_MAX]
+        self.current_setpoint_values = [0, self.IRMS_MAX]
+        self.voltage_trigger_level_values = [0, self.VRMS_MAX]
+
