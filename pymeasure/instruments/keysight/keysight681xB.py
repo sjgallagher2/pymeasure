@@ -68,6 +68,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         values=[0, 1],
         dynamic=True,
     )
+
     clipped_sine_setpoint_pct = Instrument.control(
         "FUNC:CSIN?",
         "FUNC:CSIN %f",
@@ -75,6 +76,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         validator=strict_range,
         values=[0.0, 100.0],
     )
+
     current_setpoint = Instrument.control(
         "CURRENT?",
         "CURRENT %f",
@@ -83,6 +85,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         values=[0, 1],
         dynamic=True,
     )
+
     frequency_setpoint = Instrument.control(
         "FREQ?",
         "FREQ %f",
@@ -90,6 +93,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         validator=strict_range,
         values=FREQ_RANGE,
     )
+
     voltage_dc = Instrument.measurement("MEAS:VOLT:DC?", """Measure DC voltage in volts.""")
     voltage_ac = Instrument.measurement("MEAS:VOLT:AC?", """Measure AC RMS voltage in volts.""")
     voltage_acdc = Instrument.measurement("MEAS:VOLT:ACDC?", """Measure ACDC voltage in volts.""")
@@ -99,24 +103,30 @@ class Keysight681xB(SCPIMixin, Instrument):
     current_amplitude = Instrument.measurement(
         "MEAS:CURR:AMPL:MAX?", """Measure peak current amplitude in amperes."""
     )
+
     crest_factor = Instrument.measurement(
         "MEAS:CURR:CRESTFACTOR?", """Measure current crest factor."""
     )
+
     power_dc = Instrument.measurement("MEAS:POW:DC?", """Measure DC power.""")
     power_real = Instrument.measurement("MEAS:POW:AC:REAL?", """Measure AC real power in watts.""")
     power_apparent = Instrument.measurement(
         "MEAS:POW:AC:APPARENT?", """Measure AC apparent power in VA."""
     )
+
     power_reactive = Instrument.measurement(
         "MEAS:POW:AC:REACTIVE?", """Measure AC reactive power in VAR."""
     )
+
     power_total = Instrument.measurement(
         "MEAS:POW:AC:TOTAL?", """Measure three-phase total AC power."""
     )
+
     frequency = Instrument.measurement("MEAS:FREQUENCY?", """Measure AC frequency in hertz.""")
     power_factor = Instrument.measurement(
         "MEAS:POW:AC:PFACTOR?", """Measure AC power factor in degrees."""
     )
+
     waveform = Instrument.control(
         "FUNC?",
         "FUNC %s",
@@ -124,6 +134,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         waveform.""",
         cast=str,
     )
+
     output_state = Instrument.control(
         "OUTPUT:STATE?",
         "OUTPUT:STATE %s",
@@ -150,6 +161,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         values=["BUS", "EXT", "EXTERNAL", "IMM", "IMMEDIATE"],
         cast=str,
     )
+
     trigger_sync_source = Instrument.control(
         "TRIG:SYNC:SOUR?",
         "TRIG:SYNC:SOUR %s",
@@ -163,6 +175,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         values=["IMM", "IMMEDIATE", "PHAS", "PHASE"],
         cast=str,
     )
+
     trigger_sync_phase = Instrument.control(
         "TRIG:SYNC:PHASE?",
         "TRIG:SYNC:PHASE %f",
@@ -174,6 +187,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         validator=strict_range,
         values=[0, 360],
     )
+
     voltage_trigger_level = Instrument.control(
         "VOLT:TRIG?",
         "VOLT:TRIG %f",
@@ -182,6 +196,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         values=[0, 1],
         dynamic=True,
     )
+
     voltage_trigger_mode = Instrument.control(
         "VOLT:MODE?",
         "VOLT:MODE %s",
@@ -190,6 +205,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         values=["FIX", "FIXED", "STEP", "PULS", "PULSE", "LIST"],
         cast=str,
     )
+
     pulse_count = Instrument.control(
         "PULSE:COUNT?",
         "PULSE:COUNT %f",
@@ -197,6 +213,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         validator=strict_range,
         values=[1, 9.9e37],
     )
+
     pulse_period = Instrument.control(
         "PULSE:PER?",
         "PULSE:PER %f",
@@ -204,6 +221,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         validator=strict_range,
         values=[0, 4.30133e5],
     )
+
     pulse_duty_cycle_pct = Instrument.control(
         "PULSE:DCYCLE?",
         "PULSE:DCYCLE %f",
@@ -211,6 +229,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         validator=strict_range,
         values=[0, 100],
     )
+
     pulse_width = Instrument.control(
         "PULSE:WIDTH?",
         "PULSE:WIDTH %f",
