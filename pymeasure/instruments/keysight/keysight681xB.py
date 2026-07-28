@@ -22,6 +22,7 @@
 # THE SOFTWARE.
 #
 from enum import Enum
+from time import sleep
 
 import numpy as np
 
@@ -109,11 +110,12 @@ class Keysight681xB(SCPIMixin, Instrument):
     power_factor = Instrument.measurement(
         "MEAS:POW:AC:PFACTOR?", """Measure AC power factor in degrees."""
     )
-    output_function = Instrument.control(
+    waveform = Instrument.control(
         "FUNC?",
         "FUNC %s",
         """Control the output function of the ac source. Can be SIN, SQU, CSIN, or a user
         waveform.""",
+        cast=str,
     )
     output_state = Instrument.control(
         "OUTPUT:STATE?",
@@ -125,12 +127,213 @@ class Keysight681xB(SCPIMixin, Instrument):
         validator=strict_discrete_set,
         values=_BOOLS,
         map_values=True,
+        cast=str,
     )
+
+    trigger_source = Instrument.control(
+        "TRIG:SOUR?",
+        "TRIG:SEQ1:SOUR %s",
+        """Control the trigger source for first sequence. Can be BUS|EXTernal|IMMediate.
+
+        When set to BUS, the trigger will activate after receiving a *TRG command over GPIB.
+        When set to EXTernal, the AC source backplane BNC trigger input is used as the trigger.
+        When set to IMMediate, the trigger is generated as soon as the trigger system is initiated.
+        """,
+        validator=strict_discrete_set,
+        values=["BUS", "EXT", "EXTERNAL", "IMM", "IMMEDIATE"],
+        cast=str,
+    )
+    trigger_sync_source = Instrument.control(
+        "TRIG:SYNC:SOUR?",
+        "TRIG:SYNC:SOUR %s",
+        """Control the trigger system synchronization source.
+        The trigger system can delay the trigger event until a certain synchronization event
+        occurs. In particular, it can delay until the waveform phase reaches a particular value.
+
+        Values can be IMMediate|PHASe.
+        """,
+        validator=strict_discrete_set,
+        values=["IMM", "IMMEDIATE", "PHAS", "PHASE"],
+        cast=str,
+    )
+    trigger_sync_phase = Instrument.control(
+        "TRIG:SYNC:PHASE?",
+        "TRIG:SYNC:PHASE %f",
+        """Control the trigger synchronization phase value.
+
+        When the trigger is phase synchronized, it waits until the waveform reaches this phase
+        before the triggered event actually occurs.
+        """,
+        validator=truncated_range,
+        values=[0, 360],
+    )
+    voltage_trigger_level = Instrument.control(
+        "VOLT:TRIG?",
+        "VOLT:TRIG %f",
+        """Control the AC RMS amplitude of the output waveform when triggered.""",
+        validator=truncated_range,
+        values=[0, 300],
+    )
+    voltage_trigger_mode = Instrument.control(
+        "VOLT:MODE?",
+        "VOLT:MODE %s",
+        """Control the voltage trigger mode""",
+        validator=strict_discrete_set,
+        values=["FIX", "FIXED", "STEP", "PULS", "PULSE", "LIST"],
+        cast=str,
+    )
+    pulse_count = Instrument.control(
+        "PULSE:COUNT?",
+        "PULSE:COUNT %f",
+        """Control the number of pulses when trigger mode is set to PULSE.""",
+        validator=truncated_range,
+        values=[1, 9.9e37],
+    )
+    pulse_period = Instrument.control(
+        "PULSE:PER?",
+        "PULSE:PER %f",
+        """Control pulse period in seconds when trigger mode is set to PULSE.""",
+        validator=truncated_range,
+        values=[0, 4.30133e5],
+    )
+    pulse_duty_cycle_pct = Instrument.control(
+        "PULSE:DCYCLE?",
+        "PULSE:DCYCLE %f",
+        """Control pulse duty cycle as a percentage (0-100) when trigger mode is set to PULSE.""",
+        validator=truncated_range,
+        values=[0, 100],
+    )
+    pulse_width = Instrument.control(
+        "PULSE:WIDTH?",
+        "PULSE:WIDTH %f",
+        """Control the width in seconds of a transient output pulse when trigger mode is set to
+        PULSE.""",
+        validator=truncated_range,
+        values=[0, 4.30133e5],
+    )
+
+    def arm_immediate_trigger(self):
+        """Arm the trigger system (SEQ1). Before a trigger can have effect, the trigger subsystem
+        must be armed, or 'initialized'. This method arms the trigger for a single event."""
+        self.write("INIT:SEQ1")
+
+    def arm_continuous_trigger(self, run=True):
+        """Arm the trigger system (SEQ1). Before a trigger can have effect, the trigger subsystem
+        must be armed, or 'initialized'. This method arms or disarms the trigger for a continuous
+        run.
+
+        :param run: if True, enable continuous triggering; if False, stop continuous triggering."""
+        if run:
+            self.write("INIT:CONT:SEQ1 ON")
+        else:
+            self.write("INIT:CONT:SEQ1 OFF")
+
+    def send_GPIB_trigger(self):
+        """Send a GPIB trigger signal. The trigger source must be set to BUS for this to have
+        any effect. This function forces the trigger source to be BUS before sending."""
+        self.trigger_source = "BUS"
+        self.write("*TRG")
 
     def output_enable(self, enable: bool = True):
         """Enable or disable the AC source."""
         self.output_state = enable
 
+    def output_enable_at_phase(self, trig_phase: float):
+        """Enable the output at a given phase.
+
+        This method uses the existing voltage setpoint to set a voltage step level on trigger.
+        The voltage setpoint is set to 0V, the output is enabled, and the trigger system is used
+        to step the voltage to the prior setpoint when we send *TRG and the waveform phase
+        reaches `phase`. A GPIB trigger is sent.
+
+        After this method, the voltage setpoint will be the same as before, the trigger SYNC
+        source will be PHASE, and the voltage trigger mode will be STEP.
+
+        Example:
+        ```python
+        # Reset and configure the output
+        acsource.reset()
+        acsource.voltage_setpoint = 50
+        acsource.frequency_setpoint = 60
+        acsource.output_enable_at_phase(90)  # start waveform at 90 degrees
+        ```
+        """
+        vset = self.voltage_setpoint
+        self.voltage_setpoint = 0
+        self.output_enable(True)
+        self.voltage_trigger_mode = "STEP"
+        self.voltage_trigger_level = vset
+        self.trigger_sync_source = "PHASE"
+        self.trigger_sync_phase = trig_phase
+        sleep(1)  # MUST dwell here for trigger to work.
+        self.arm_immediate_trigger()
+        self.send_GPIB_trigger()
+
+    def output_pulse(self, Vdefault, Vpulse, pulse_period, N_pulses=1, pulse_ON_time=-1):
+        """Trigger one or more voltage pulses.
+
+        :param N_pulses: number of pulses to output
+        :param Vdefault: default voltage, or pulse OFF state voltage
+        :param Vpulse: pulse ON state voltage
+        :param pulse_period: Time duration of one full pulse (an ON and an OFF duration)
+        :param pulse_ON_time: Time duration for pulse ON state, or -1 for a single pulse.
+        """
+        if pulse_ON_time == -1:
+            pulse_ON_time = pulse_period
+        self.voltage_setpoint = Vdefault
+        self.output_enable(True)
+        sleep(1)  # Dwell before trigger setup
+        self.voltage_trigger_mode = "PULSE"
+        self.voltage_trigger_level = Vpulse
+        self.pulse_count = N_pulses
+        self.pulse_period = pulse_period
+        self.pulse_width = pulse_ON_time
+        self.arm_immediate_trigger()
+        self.send_GPIB_trigger()
+
+    def output_pulse_at_phase(
+        self,
+        Vdefault,
+        Vpulse,
+        pulse_period,
+        trig_phase=0.0,
+        N_pulses=1,
+        pulse_ON_time=-1,
+        trigger_source="GPIB",
+    ):
+        """Trigger one or more voltage pulses, waiting for a particular phase angle before
+        triggering.
+
+        If trigger source is GPIB, trigger is sent immediately. if trigger source is
+        external, this function returns with the system armed for an external trigger.
+
+        :param Vdefault: default voltage, or pulse OFF state voltage
+        :param Vpulse: pulse ON state voltage
+        :param pulse_period: Time duration of one full pulse (an ON and an OFF duration)
+        :param trig_phase: waveform phase angle at which to trigger
+        :param N_pulses: number of pulses to output
+        :param pulse_ON_time: Time duration for pulse ON state, or -1 for a single pulse.
+        :param trigger_source: Trigger source, can be GPIB|BUS|EXTernal|IMMediate.
+        """
+        if pulse_ON_time == -1:
+            pulse_ON_time = pulse_period
+        self.voltage_setpoint = Vdefault
+        self.output_enable(True)
+        sleep(1)  # Dwell before trigger setup
+        self.voltage_trigger_mode = "PULSE"
+        self.voltage_trigger_level = Vpulse
+        self.pulse_count = N_pulses
+        self.pulse_period = pulse_period
+        self.pulse_width = pulse_ON_time
+        self.trigger_sync_source = "PHASE"
+        self.trigger_sync_phase = trig_phase
+        self.arm_immediate_trigger()
+        if trigger_source == "GPIB" or trigger_source == "BUS":
+            self.send_GPIB_trigger()
+        else:
+            self.trigger_source = trigger_source
+
+    # WAVEFORMS #
     user_wfm_catalog = Instrument.measurement(
         "TRACE:CATALOG?",
         """Get the user waveform catalog.""",
@@ -211,5 +414,3 @@ class Keysight681xB(SCPIMixin, Instrument):
         # Add name if needed, then write data
         self.define_user_waveform_name(name)
         self.write(f"TRACE:DATA {name}, " + ", ".join(wave))
-
-
