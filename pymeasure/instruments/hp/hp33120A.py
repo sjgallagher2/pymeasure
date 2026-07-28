@@ -22,10 +22,11 @@
 # THE SOFTWARE.
 #
 
+import logging
+
 from pymeasure.instruments import Instrument, SCPIUnknownMixin
 from pymeasure.instruments.validators import strict_discrete_set,truncated_range
 
-import logging
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 

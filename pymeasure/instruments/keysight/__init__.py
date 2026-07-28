@@ -30,4 +30,4 @@ from .keysightE36312A import KeysightE36312A
 from .keysightN5767A import KeysightN5767A
 from .keysightN7776C import KeysightN7776C
 from .keysightPNA import KeysightPNA
-from .keysight681xB import Keysight681xB
+from .keysight681xB import Keysight6811B, Keysight6812B, Keysight6813B

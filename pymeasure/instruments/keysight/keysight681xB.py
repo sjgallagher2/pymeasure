@@ -21,139 +21,123 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #
-from enum import Enum
 from time import sleep
 
 import numpy as np
 
 from pymeasure.instruments import Instrument
 from pymeasure.instruments.generic_types import SCPIMixin
-from pymeasure.instruments.validators import strict_discrete_set, truncated_range
+from pymeasure.instruments.validators import strict_discrete_set, strict_range
+from pymeasure.instruments._strenum import StrEnum
 
-try:
-    from enum import StrEnum
-except ImportError:
-    class StrEnum(str, Enum):
-        """Until StrEnum is broadly available / pymeasure relies on python <=
-        3.10.x."""
-
-        def __str__(self):
-            return self.value
 
 class Functions(StrEnum):
-    SINE="SIN"
-    SQUARE="SQU"
-    CLIPPED_SINE="CSIN"  # Clipped sinewave output. Both positive and negative peak amplitudes
-                         # are clipped at a value determined by the FUNC:CSIN command.
+    SINE = "SIN"
+    SQUARE = "SQU"
+    CLIPPED_SINE = "CSIN"  # Clipped sinewave output. Both positive and negative peak amplitudes
+    # are clipped at a value determined by the FUNC:CSIN command.
+
 
 class Modes(StrEnum):
-    FIXED="FIX"   # unaffected by a triggered output transient.
-    STEP="STEP"   # programmed to the value set by X:TRIG when a triggered transient occurs.
-    PULSE="PULS"  # changed to the value set by X:TRIG for a duration determined by the pulse
-                  # commands.
-    LIST="LIST"   # controlled by the waveform shape list when a triggered transient occurs.
+    FIXED = "FIX"  # unaffected by a triggered output transient.
+    STEP = "STEP"  # programmed to the value set by X:TRIG when a triggered transient occurs.
+    PULSE = "PULS"  # changed to the value set by X:TRIG for a duration determined by the pulse
+    # commands.
+    LIST = "LIST"  # controlled by the waveform shape list when a triggered transient occurs.
+
 
 class Keysight681xB(SCPIMixin, Instrument):
-    """Represents the Keysight 6811B, 6812B, and 6813B AC Power Source/Analyzers."""
+    """Represents the Keysight 681xB series of AC Power Source/Analyzers.
+
+    Do not use this class directly; use one of its subclasses.
+    """
 
     _BOOLS = {True: 1, False: 0}
+    FREQ_RANGE = [45, 1000]
+    ROUT_RANGE = [0, 1]
+    LOUT_RANGE = [20e-6, 1e-3]  # Henries
 
-    def __init__(self, adapter, name="Keysight 681xB AC Power Source/Analyzer",
-                 **kwargs):
+    def __init__(self, adapter, name="Keysight 681xB AC Power Source/Analyzer", **kwargs):
         super().__init__(adapter, name, **kwargs)
 
     voltage_setpoint = Instrument.control(
-        "VOLT?", "VOLT %f",
+        "VOLT?",
+        "VOLT %f",
         """Control the AC RMS voltage amplitude setpoint in volts.""",
-        validator=truncated_range,
-        values=[0,300],
+        validator=strict_range,
+        values=[0, 1],
+        dynamic=True,
     )
+
     clipped_sine_setpoint_pct = Instrument.control(
-        "FUNC:CSIN?","FUNC:CSIN %f",
+        "FUNC:CSIN?",
+        "FUNC:CSIN %f",
         """Control clipped sine clipping point as a percent (0-100) of peak amplitude.""",
-        validator=truncated_range,
-        values=[0.,100.]
+        validator=strict_range,
+        values=[0.0, 100.0],
     )
+
     current_setpoint = Instrument.control(
-        "CURRENT?","CURRENT %f",
+        "CURRENT?",
+        "CURRENT %f",
         """Control the AC RMS current limit setpoint in amperes.""",
-        validator=truncated_range,
-        values=[0,13.0],  # default limit, for 6813B
+        validator=strict_range,
+        values=[0, 1],
+        dynamic=True,
     )
+
     frequency_setpoint = Instrument.control(
-        "FREQ?","FREQ %f",
+        "FREQ?",
+        "FREQ %f",
         """Control the frequency setpoint in hertz""",
-        validator=truncated_range,
-        values=[45,1000]
+        validator=strict_range,
+        values=FREQ_RANGE,
     )
-    voltage_dc = Instrument.measurement(
-        "MEAS:VOLT:DC?",
-        """Measure DC voltage in volts."""
-    )
-    voltage_ac = Instrument.measurement(
-        "MEAS:VOLT:AC?",
-        """Measure AC RMS voltage in volts."""
-    )
-    voltage_acdc = Instrument.measurement(
-        "MEAS:VOLT:ACDC?",
-        """Measure ACDC voltage in volts."""
-    )
-    current_dc = Instrument.measurement(
-        "MEAS:CURR:DC?",
-        """Measure DC current in amperes."""
-    )
-    current_ac = Instrument.measurement(
-        "MEAS:CURR:AC?",
-        """Measure AC RMS current in amperes."""
-    )
-    current_acdc = Instrument.measurement(
-        "MEAS:CURR:ACDC?",
-        """Measure ACDC current in amperes."""
-    )
+
+    voltage_dc = Instrument.measurement("MEAS:VOLT:DC?", """Measure DC voltage in volts.""")
+    voltage_ac = Instrument.measurement("MEAS:VOLT:AC?", """Measure AC RMS voltage in volts.""")
+    voltage_acdc = Instrument.measurement("MEAS:VOLT:ACDC?", """Measure ACDC voltage in volts.""")
+    current_dc = Instrument.measurement("MEAS:CURR:DC?", """Measure DC current in amperes.""")
+    current_ac = Instrument.measurement("MEAS:CURR:AC?", """Measure AC RMS current in amperes.""")
+    current_acdc = Instrument.measurement("MEAS:CURR:ACDC?", """Measure ACDC current in amperes.""")
     current_amplitude = Instrument.measurement(
-        "MEAS:CURR:AMPL:MAX?",
-        """Measure peak current amplitude in amperes."""
+        "MEAS:CURR:AMPL:MAX?", """Measure peak current amplitude in amperes."""
     )
+
     crest_factor = Instrument.measurement(
-        "MEAS:CURR:CRESTFACTOR?",
-        """Measure current crest factor."""
+        "MEAS:CURR:CRESTFACTOR?", """Measure current crest factor."""
     )
-    power_dc = Instrument.measurement(
-        "MEAS:POW:DC?",
-        """Measure DC power."""
-    )
-    power_real = Instrument.measurement(
-        "MEAS:POW:AC:REAL?",
-        """Measure AC real power in watts."""
-    )
+
+    power_dc = Instrument.measurement("MEAS:POW:DC?", """Measure DC power.""")
+    power_real = Instrument.measurement("MEAS:POW:AC:REAL?", """Measure AC real power in watts.""")
     power_apparent = Instrument.measurement(
-        "MEAS:POW:AC:APPARENT?",
-        """Measure AC apparent power in VA."""
+        "MEAS:POW:AC:APPARENT?", """Measure AC apparent power in VA."""
     )
+
     power_reactive = Instrument.measurement(
-        "MEAS:POW:AC:REACTIVE?",
-        """Measure AC reactive power in VAR."""
+        "MEAS:POW:AC:REACTIVE?", """Measure AC reactive power in VAR."""
     )
+
     power_total = Instrument.measurement(
-        "MEAS:POW:AC:TOTAL?",
-        """Measure three-phase total AC power."""
+        "MEAS:POW:AC:TOTAL?", """Measure three-phase total AC power."""
     )
-    frequency = Instrument.measurement(
-        "MEAS:FREQUENCY?",
-        """Measure AC frequency in hertz."""
-    )
+
+    frequency = Instrument.measurement("MEAS:FREQUENCY?", """Measure AC frequency in hertz.""")
     power_factor = Instrument.measurement(
-        "MEAS:POW:AC:PFACTOR?",
-        """Measure AC power factor in degrees."""
+        "MEAS:POW:AC:PFACTOR?", """Measure AC power factor in degrees."""
     )
+
     waveform = Instrument.control(
-        "FUNC?","FUNC %s",
+        "FUNC?",
+        "FUNC %s",
         """Control the output function of the ac source. Can be SIN, SQU, CSIN, or a user
         waveform.""",
         cast=str,
     )
+
     output_state = Instrument.control(
-        "OUTPUT:STATE?","OUTPUT:STATE %s",
+        "OUTPUT:STATE?",
+        "OUTPUT:STATE %s",
         """Control the enable/disable state of the AC source (bool).
 
         See also :py:method:`output_enable()`.
@@ -165,7 +149,8 @@ class Keysight681xB(SCPIMixin, Instrument):
     )
 
     trigger_source = Instrument.control(
-        "TRIG:SOUR?","TRIG:SEQ1:SOUR %s",
+        "TRIG:SOUR?",
+        "TRIG:SEQ1:SOUR %s",
         """Control the trigger source for first sequence. Can be BUS|EXTernal|IMMediate.
 
         When set to BUS, the trigger will activate after receiving a *TRG command over GPIB.
@@ -173,11 +158,13 @@ class Keysight681xB(SCPIMixin, Instrument):
         When set to IMMediate, the trigger is generated as soon as the trigger system is initiated.
         """,
         validator=strict_discrete_set,
-        values=["BUS","EXT","EXTERNAL","IMM","IMMEDIATE"],
+        values=["BUS", "EXT", "EXTERNAL", "IMM", "IMMEDIATE"],
         cast=str,
     )
+
     trigger_sync_source = Instrument.control(
-        "TRIG:SYNC:SOUR?","TRIG:SYNC:SOUR %s",
+        "TRIG:SYNC:SOUR?",
+        "TRIG:SYNC:SOUR %s",
         """Control the trigger system synchronization source.
         The trigger system can delay the trigger event until a certain synchronization event
         occurs. In particular, it can delay until the waveform phase reaches a particular value.
@@ -185,85 +172,109 @@ class Keysight681xB(SCPIMixin, Instrument):
         Values can be IMMediate|PHASe.
         """,
         validator=strict_discrete_set,
-        values=['IMM','IMMEDIATE','PHAS','PHASE'],
+        values=["IMM", "IMMEDIATE", "PHAS", "PHASE"],
         cast=str,
     )
+
     trigger_sync_phase = Instrument.control(
-        "TRIG:SYNC:PHASE?","TRIG:SYNC:PHASE %f",
+        "TRIG:SYNC:PHASE?",
+        "TRIG:SYNC:PHASE %f",
         """Control the trigger synchronization phase value.
 
         When the trigger is phase synchronized, it waits until the waveform reaches this phase
         before the triggered event actually occurs.
         """,
-        validator=truncated_range,
-        values=[0,360],
+        validator=strict_range,
+        values=[0, 360],
     )
+
     voltage_trigger_level = Instrument.control(
-        "VOLT:TRIG?","VOLT:TRIG %f",
+        "VOLT:TRIG?",
+        "VOLT:TRIG %f",
         """Control the AC RMS amplitude of the output waveform when triggered.""",
-        validator=truncated_range,
-        values=[0,300],
+        validator=strict_range,
+        values=[0, 1],
+        dynamic=True,
     )
+
     voltage_trigger_mode = Instrument.control(
-        "VOLT:MODE?","VOLT:MODE %s",
+        "VOLT:MODE?",
+        "VOLT:MODE %s",
         """Control the voltage trigger mode""",
         validator=strict_discrete_set,
-        values=["FIX","FIXED","STEP","PULS","PULSE","LIST"],
+        values=["FIX", "FIXED", "STEP", "PULS", "PULSE", "LIST"],
         cast=str,
     )
+
     pulse_count = Instrument.control(
-        "PULSE:COUNT?","PULSE:COUNT %f",
+        "PULSE:COUNT?",
+        "PULSE:COUNT %f",
         """Control the number of pulses when trigger mode is set to PULSE.""",
-        validator=truncated_range,
-        values=[1,9.9E37],
+        validator=strict_range,
+        values=[1, 9.9e37],
     )
+
     pulse_period = Instrument.control(
-        "PULSE:PER?","PULSE:PER %f",
+        "PULSE:PER?",
+        "PULSE:PER %f",
         """Control pulse period in seconds when trigger mode is set to PULSE.""",
-        validator=truncated_range,
-        values=[0,4.30133E5],
+        validator=strict_range,
+        values=[0, 4.30133e5],
     )
+
     pulse_duty_cycle_pct = Instrument.control(
-        "PULSE:DCYCLE?","PULSE:DCYCLE %f",
+        "PULSE:DCYCLE?",
+        "PULSE:DCYCLE %f",
         """Control pulse duty cycle as a percentage (0-100) when trigger mode is set to PULSE.""",
-        validator=truncated_range,
-        values=[0,100],
+        validator=strict_range,
+        values=[0, 100],
     )
+
     pulse_width = Instrument.control(
-        "PULSE:WIDTH?","PULSE:WIDTH %f",
+        "PULSE:WIDTH?",
+        "PULSE:WIDTH %f",
         """Control the width in seconds of a transient output pulse when trigger mode is set to
         PULSE.""",
-        validator=truncated_range,
-        values=[0,4.30133E5],
+        validator=strict_range,
+        values=[0, 4.30133e5],
+    )
+
+    voltage_sense_source = Instrument.control(
+        "VOLTAGE:SENSE:SOURCE?", "VOLTAGE:SENSE:SOURCE %s",
+        """Control the source from which the output voltage is sensed. Can be INTernal or
+        EXTernal.""",
+        validator=strict_discrete_set,
+        values=['EXT', 'EXTERNAL', 'INT', 'INTERNAL'],
+        cast=str,
     )
 
     def arm_immediate_trigger(self):
         """Arm the trigger system (SEQ1). Before a trigger can have effect, the trigger subsystem
         must be armed, or 'initialized'. This method arms the trigger for a single event."""
-        self.write('INIT:SEQ1')
+        self.write("INIT:SEQ1")
 
-    def arm_continuous_trigger(self,run=True):
+    def arm_continuous_trigger(self, run=True):
         """Arm the trigger system (SEQ1). Before a trigger can have effect, the trigger subsystem
         must be armed, or 'initialized'. This method arms or disarms the trigger for a continuous
         run.
 
         :param run: if True, enable continuous triggering; if False, stop continuous triggering."""
         if run:
-            self.write('INIT:CONT:SEQ1 ON')
+            self.write("INIT:CONT:SEQ1 ON")
         else:
-            self.write('INIT:CONT:SEQ1 OFF')
+            self.write("INIT:CONT:SEQ1 OFF")
 
     def send_GPIB_trigger(self):
         """Send a GPIB trigger signal. The trigger source must be set to BUS for this to have
         any effect. This function forces the trigger source to be BUS before sending."""
-        self.trigger_source = 'BUS'
-        self.write('*TRG')
+        self.trigger_source = "BUS"
+        self.write("*TRG")
 
-    def output_enable(self,enable: bool = True):
+    def output_enable(self, enable: bool = True):
         """Enable or disable the AC source."""
         self.output_state = enable
 
-    def output_enable_at_phase(self,trig_phase: float):
+    def output_enable_at_phase(self, trig_phase: float):
         """Enable the output at a given phase.
 
         This method uses the existing voltage setpoint to set a voltage step level on trigger.
@@ -286,15 +297,15 @@ class Keysight681xB(SCPIMixin, Instrument):
         vset = self.voltage_setpoint
         self.voltage_setpoint = 0
         self.output_enable(True)
-        self.voltage_trigger_mode = 'STEP'
+        self.voltage_trigger_mode = "STEP"
         self.voltage_trigger_level = vset
-        self.trigger_sync_source = 'PHASE'
+        self.trigger_sync_source = "PHASE"
         self.trigger_sync_phase = trig_phase
         sleep(1)  # MUST dwell here for trigger to work.
         self.arm_immediate_trigger()
         self.send_GPIB_trigger()
 
-    def output_pulse(self,Vdefault,Vpulse,pulse_period,N_pulses=1,pulse_ON_time=-1):
+    def output_pulse(self, Vdefault, Vpulse, pulse_period, N_pulses=1, pulse_ON_time=-1):
         """Trigger one or more voltage pulses.
 
         :param N_pulses: number of pulses to output
@@ -308,7 +319,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         self.voltage_setpoint = Vdefault
         self.output_enable(True)
         sleep(1)  # Dwell before trigger setup
-        self.voltage_trigger_mode = 'PULSE'
+        self.voltage_trigger_mode = "PULSE"
         self.voltage_trigger_level = Vpulse
         self.pulse_count = N_pulses
         self.pulse_period = pulse_period
@@ -316,8 +327,16 @@ class Keysight681xB(SCPIMixin, Instrument):
         self.arm_immediate_trigger()
         self.send_GPIB_trigger()
 
-    def output_pulse_at_phase(self,Vdefault,Vpulse,pulse_period,trig_phase=0.,N_pulses=1,
-                              pulse_ON_time=-1,trigger_source="GPIB"):
+    def output_pulse_at_phase(
+        self,
+        Vdefault,
+        Vpulse,
+        pulse_period,
+        trig_phase=0.0,
+        N_pulses=1,
+        pulse_ON_time=-1,
+        trigger_source="GPIB",
+    ):
         """Trigger one or more voltage pulses, waiting for a particular phase angle before
         triggering.
 
@@ -342,7 +361,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         self.pulse_count = N_pulses
         self.pulse_period = pulse_period
         self.pulse_width = pulse_ON_time
-        self.trigger_sync_source = 'PHASE'
+        self.trigger_sync_source = "PHASE"
         self.trigger_sync_phase = trig_phase
         self.arm_immediate_trigger()
         if trigger_source == "GPIB" or trigger_source == "BUS":
@@ -354,16 +373,17 @@ class Keysight681xB(SCPIMixin, Instrument):
     user_wfm_catalog = Instrument.measurement(
         "TRACE:CATALOG?",
         """Get the user waveform catalog.""",
-        get_process_list=lambda names: [name.replace('"','') for name in names]
+        get_process_list=lambda names: [str(name).replace('"', "") for name in names],
     )
-    def get_user_wfm_data(self,name: str):
+
+    def get_user_wfm_data(self, name: str):
         """Get the data points for a particular user waveform.
 
         :param name: internal name of user waveform.
         :return: numpy array of y-data points with dtype float.
         """
         data_str = self.ask(f"TRACE:DATA? {name.upper()}")
-        data = np.array(data_str.strip().split(','),dtype=float)
+        data = np.array(data_str.strip().split(","), dtype=float)
         return data
 
     def get_user_waveform_catalog(self):
@@ -372,20 +392,20 @@ class Keysight681xB(SCPIMixin, Instrument):
         names = self.user_wfm_catalog
         cat = {}
         for name in names:
-            if name not in ["SINUSOID","SQUARE","CSINUSOID"]:
+            if name not in ["SINUSOID", "SQUARE", "CSINUSOID"]:
                 namedata = self.get_user_wfm_data(name)
                 cat[name] = namedata
         return cat
 
-    def delete_user_waveform(self,name: str):
+    def delete_user_waveform(self, name: str):
         """Delete a user waveform by name."""
-        self.write(f'TRACE:DEL {name}')
+        self.write(f"TRACE:DEL {name}")
 
-    def define_user_waveform_name(self,name: str):
+    def define_user_waveform_name(self, name: str):
         """Define a user waveform name without data."""
-        self.write(f'TRACE:DEF {name}')
+        self.write(f"TRACE:DEF {name}")
 
-    def add_user_waveform(self,name,data1024,delete_existing=False):
+    def add_user_waveform(self, name, data1024, delete_existing=False):
         """Add a waveform called `name` with 1024 float data points in [0.0, 1.0] to the user
         waveform catalog.
 
@@ -407,8 +427,9 @@ class Keysight681xB(SCPIMixin, Instrument):
                                 adding the new data. If False, raises an exception if name exists.
         """
         if len(data1024) != 1024:
-            raise ValueError(f"Length error, received array of length {len(data1024)}; length "\
-                             "must be 1024.")
+            raise ValueError(
+                f"Length error, received array of length {len(data1024)}; length must be 1024."
+            )
         data1024f = data1024.astype(float)
 
         # Preprocess name, delete existing trace if present
@@ -418,16 +439,54 @@ class Keysight681xB(SCPIMixin, Instrument):
                 print(f"NOTE: Deleting existing waveform '{name}'")
                 self.delete_user_waveform(name)
             else:
-                raise ValueError("Waveform with this name already exists. To override, "\
-                                 "use `delete_existing=True`.")
+                raise ValueError(
+                    "Waveform with this name already exists. To override, "
+                    "use `delete_existing=True`."
+                )
 
         # Convert to 5 digits of precision
-        wave = [f'{x:.5f}' for x in data1024f]
+        wave = [f"{x:.5f}" for x in data1024f]
 
         # Add name if needed, then write data
         self.define_user_waveform_name(name)
-        self.write(f'TRACE:DATA {name}, '+', '.join(wave))
+        self.write(f"TRACE:DATA {name}, " + ", ".join(wave))
 
 
+class Keysight6811B(Keysight681xB):
+    VRMS_MAX = 300
+    IRMS_MAX = 3.25
+    VPEAK_MAX = 425
+    IPEAK_MAX = 40
 
+    def __init__(self, adapter, name="Keysight 6811B AC Power Source/Analyzer", **kwargs):
+        super().__init__(adapter, name, **kwargs)
+        self.voltage_setpoint_values = [0, self.VRMS_MAX]
+        self.current_setpoint_values = [0, self.IRMS_MAX]
+        self.voltage_trigger_level_values = [0, self.VRMS_MAX]
+
+
+class Keysight6812B(Keysight681xB):
+    VRMS_MAX = 300
+    IRMS_MAX = 6.5
+    VPEAK_MAX = 425
+    IPEAK_MAX = 40
+
+    def __init__(self, adapter, name="Keysight 6812B AC Power Source/Analyzer", **kwargs):
+        super().__init__(adapter, name, **kwargs)
+        self.voltage_setpoint_values = [0, self.VRMS_MAX]
+        self.current_setpoint_values = [0, self.IRMS_MAX]
+        self.voltage_trigger_level_values = [0, self.VRMS_MAX]
+
+
+class Keysight6813B(Keysight681xB):
+    VRMS_MAX = 300
+    IRMS_MAX = 13
+    VPEAK_MAX = 425
+    IPEAK_MAX = 80
+
+    def __init__(self, adapter, name="Keysight 6813B AC Power Source/Analyzer", **kwargs):
+        super().__init__(adapter, name, **kwargs)
+        self.voltage_setpoint_values = [0, self.VRMS_MAX]
+        self.current_setpoint_values = [0, self.IRMS_MAX]
+        self.voltage_trigger_level_values = [0, self.VRMS_MAX]
 
