@@ -211,6 +211,15 @@ class Keysight681xB(SCPIMixin, Instrument):
         values=[0, 4.30133e5],
     )
 
+    voltage_sense_source = Instrument.control(
+        "VOLTAGE:SENSE:SOURCE?", "VOLTAGE:SENSE:SOURCE %s",
+        """Control the source from which the output voltage is sensed. Can be INTernal or
+        EXTernal.""",
+        validator=strict_discrete_set,
+        values=['EXT', 'EXTERNAL', 'INT', 'INTERNAL'],
+        cast=str,
+    )
+
     def arm_immediate_trigger(self):
         """Arm the trigger system (SEQ1). Before a trigger can have effect, the trigger subsystem
         must be armed, or 'initialized'. This method arms the trigger for a single event."""
