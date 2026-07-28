@@ -21,14 +21,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #
-from enum import Enum
 from time import sleep
 
 import numpy as np
 
 from pymeasure.instruments import Instrument
 from pymeasure.instruments.generic_types import SCPIMixin
-from pymeasure.instruments.validators import strict_discrete_set, truncated_range
+from pymeasure.instruments.validators import strict_discrete_set, strict_range
 from pymeasure.instruments._strenum import StrEnum
 
 
@@ -59,28 +58,28 @@ class Keysight681xB(SCPIMixin, Instrument):
         "VOLT?",
         "VOLT %f",
         """Control the AC RMS voltage amplitude setpoint in volts.""",
-        validator=truncated_range,
+        validator=strict_range,
         values=[0, 300],
     )
     clipped_sine_setpoint_pct = Instrument.control(
         "FUNC:CSIN?",
         "FUNC:CSIN %f",
         """Control clipped sine clipping point as a percent (0-100) of peak amplitude.""",
-        validator=truncated_range,
+        validator=strict_range,
         values=[0.0, 100.0],
     )
     current_setpoint = Instrument.control(
         "CURRENT?",
         "CURRENT %f",
         """Control the AC RMS current limit setpoint in amperes.""",
-        validator=truncated_range,
+        validator=strict_range,
         values=[0, 13.0],  # default limit, for 6813B
     )
     frequency_setpoint = Instrument.control(
         "FREQ?",
         "FREQ %f",
         """Control the frequency setpoint in hertz""",
-        validator=truncated_range,
+        validator=strict_range,
         values=[45, 1000],
     )
     voltage_dc = Instrument.measurement("MEAS:VOLT:DC?", """Measure DC voltage in volts.""")
@@ -164,14 +163,14 @@ class Keysight681xB(SCPIMixin, Instrument):
         When the trigger is phase synchronized, it waits until the waveform reaches this phase
         before the triggered event actually occurs.
         """,
-        validator=truncated_range,
+        validator=strict_range,
         values=[0, 360],
     )
     voltage_trigger_level = Instrument.control(
         "VOLT:TRIG?",
         "VOLT:TRIG %f",
         """Control the AC RMS amplitude of the output waveform when triggered.""",
-        validator=truncated_range,
+        validator=strict_range,
         values=[0, 300],
     )
     voltage_trigger_mode = Instrument.control(
@@ -186,21 +185,21 @@ class Keysight681xB(SCPIMixin, Instrument):
         "PULSE:COUNT?",
         "PULSE:COUNT %f",
         """Control the number of pulses when trigger mode is set to PULSE.""",
-        validator=truncated_range,
+        validator=strict_range,
         values=[1, 9.9e37],
     )
     pulse_period = Instrument.control(
         "PULSE:PER?",
         "PULSE:PER %f",
         """Control pulse period in seconds when trigger mode is set to PULSE.""",
-        validator=truncated_range,
+        validator=strict_range,
         values=[0, 4.30133e5],
     )
     pulse_duty_cycle_pct = Instrument.control(
         "PULSE:DCYCLE?",
         "PULSE:DCYCLE %f",
         """Control pulse duty cycle as a percentage (0-100) when trigger mode is set to PULSE.""",
-        validator=truncated_range,
+        validator=strict_range,
         values=[0, 100],
     )
     pulse_width = Instrument.control(
@@ -208,7 +207,7 @@ class Keysight681xB(SCPIMixin, Instrument):
         "PULSE:WIDTH %f",
         """Control the width in seconds of a transient output pulse when trigger mode is set to
         PULSE.""",
-        validator=truncated_range,
+        validator=strict_range,
         values=[0, 4.30133e5],
     )
 
