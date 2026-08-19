@@ -157,6 +157,7 @@ class DHOScopeChannel(Channel):
         ":CHAN{ch}:LAB:CONT %s",
         """Control the label content shown for the channel (string, max
         10 chars).""",
+        cast=str,
     )
 
     label_enabled = Channel.control(
@@ -655,4 +656,51 @@ class DHOScope(SCPIMixin, Instrument):
         with open(filename,'wb') as f:
             f.write(rawb)
         return True
+
+    # =================== #
+    # CONVENIENCE METHODS #
+    # =================== #
+    def configure_channel(self, channel: int,
+                                scale_Vpdiv: float,
+                                probe_x: float,
+                                vert_offset_div: float = 0,
+                                units: str = "VOLT",
+                                label: str = "",
+                                bwlimit_Hz: str = "20M"):
+        """
+        Configure a DHOScope channel.
+
+        :param channel: {1-4}
+        :param scale_Vpdiv: volts per division
+        :param probe_x: probe attenuation factor, e.g. 1 (1x), 10 (10x)
+        :param vert_offset_div: Number of divisions to offset the trace vertically, with
+                                0 being in the vertical center, positive and negative
+                                numbers allowed. Default is 0.
+        :param units: Channel units, can be "VOLT" or "AMP". Default is "VOLT".
+        :param label: Optional channel label, to be displayed on screen. Max 10 chars.
+        :param bwlimit_Hz: Bandwidth limit setting in hertz. Can be "OFF", "20M", or "100M".
+        """
+        if channel == 1:
+            ch = self.ch_1
+        elif channel == 2:
+            ch = self.ch_2
+        elif channel == 3:
+            ch = self.ch_3
+        elif channel == 4:
+            ch = self.ch_4
+        else:
+            raise ValueError(f"Got unexpected channel {channel}; expected 1-4.")
+
+        ch.bandwidth_limit = bwlimit_Hz
+        ch.probe = probe_x  # :1
+        ch.scale = scale_Vpdiv  # V/div
+        ch.offset = vert_offset_div * ch.scale
+        ch.units = units
+        if label != "":
+            ch.label = label
+            ch.label_enabled = True
+        else:
+            ch.label_enabled = False
+        # Show trace
+        ch.display_enabled = True
 
