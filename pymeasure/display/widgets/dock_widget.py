@@ -21,24 +21,23 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #
-import logging
-
-from os import path
 import json
+import logging
+from os import path
 
+import pyqtgraph as pg
 from pyqtgraph.dockarea import Dock, DockArea
 from pyqtgraph.dockarea.Dock import DockLabel
-import pyqtgraph as pg
 
-from .plot_widget import PlotWidget, PlotFrame
 from ..Qt import QtWidgets
-from .tab_widget import TabWidget
+from .plot_widget import PlotFrame, PlotWidget
+from .tab_widget import DEFAULT_COLOR, TabWidget
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 
-class DockWidget(TabWidget, QtWidgets.QWidget):
+class DockWidget(TabWidget[list], QtWidgets.QWidget):
     """
     Widget that contains a DockArea with a number of Docks as determined by the length of
     the longest x_axis_labels or y_axis_labels list.
@@ -93,7 +92,7 @@ class DockWidget(TabWidget, QtWidgets.QWidget):
         }
         with open(self.dock_layout_filename, 'w') as f:
             f.write(json.dumps(layout))
-        log.info('Saved dock layout to file %s' % self.dock_layout_filename)
+        log.info(f'Saved dock layout to file {self.dock_layout_filename}')
 
     def save_dock_action(self):
         save_dock_action = QtWidgets.QWidgetAction(self)
@@ -135,7 +134,7 @@ class DockWidget(TabWidget, QtWidgets.QWidget):
 
         # Load dock layout file if it exists in the directory of the current procedure
         if path.exists(self.dock_layout_filename):
-            with open(self.dock_layout_filename, 'r') as f:
+            with open(self.dock_layout_filename) as f:
                 dock_layout = f.read()
             layout = json.loads(dock_layout)
             docks = layout['docks']
@@ -145,13 +144,13 @@ class DockWidget(TabWidget, QtWidgets.QWidget):
                 self.dock_area.restoreState(docks)
                 for idx, i in enumerate(self.plot_frames):
                     i.plot_frame.plot_widget.restoreState(plots[idx])
-                log.info('Loaded dock layout from file %s' % self.dock_layout_filename)
+                log.info(f'Loaded dock layout from file {self.dock_layout_filename}')
             else:
                 log.warning(
-                    'Number of displayed docks does not match number of docks in layout file %s'
-                    % self.dock_layout_filename)
+                    "Number of displayed docks does not match number of docks in layout file "
+                    f"{self.dock_layout_filename}")
 
-    def new_curve(self, results, color=pg.intColor(0), **kwargs):
+    def new_curve(self, results, color=DEFAULT_COLOR, **kwargs):
         if 'pen' not in kwargs:
             kwargs['pen'] = pg.mkPen(color=color, width=self.linewidth)
         if 'antialias' not in kwargs:
@@ -161,6 +160,6 @@ class DockWidget(TabWidget, QtWidgets.QWidget):
             curves.append(self.plot_frames[i].new_curve(results, color=color, **kwargs))
         return curves
 
-    def clear(self):
+    def clear(self) -> None:
         for i in range(self.num_plots):
             self.plot_frames[i].plot.clear()

@@ -21,18 +21,20 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #
+
 import logging
+from collections.abc import Mapping
 
 import numpy as np
 
-from pymeasure.instruments import Instrument, SCPIUnknownMixin
+from pymeasure.instruments import Instrument, SCPIUnknownMixin, cast_or_str
 from pymeasure.instruments.validators import strict_discrete_set, strict_range
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 
-class Channel():
+class Channel:
     """ Implementation of a Keysight DSOX1102G Oscilloscope channel.
 
     Implementation modeled on Channel object of Tektronix AFG3152C instrument. """
@@ -115,14 +117,13 @@ class Channel():
         """ Reads a set of values from the instrument through the adapter,
         passing on any key-word arguments.
         """
-        return self.instrument.values(":channel%d:%s" % (
-            self.number, command), **kwargs)
+        return self.instrument.values(f":channel{self.number}:{command}", **kwargs)
 
     def ask(self, command):
-        self.instrument.ask(":channel%d:%s" % (self.number, command))
+        self.instrument.ask(f":channel{self.number}:{command}")
 
     def write(self, command):
-        self.instrument.write(":channel%d:%s" % (self.number, command))
+        self.instrument.write(f":channel{self.number}:{command}")
 
     def setup(self, bwlimit=None, coupling=None, display=None, invert=None, label=None, offset=None,
               probe_attenuation=None, vertical_range=None, scale=None):
@@ -186,7 +187,7 @@ class Channel():
         # Using the instrument's ask method because Channel.ask() adds the prefix ":channelX:", and
         # to query the configuration details, we actually need to ask ":channelX?", without a
         # second ":"
-        ch_setup_raw = self.instrument.ask(":channel%d?" % self.number).strip("\n")
+        ch_setup_raw = self.instrument.ask(f":channel{self.number}?").strip("\n")
 
         # ch_setup_raw hat the following format:
         # :CHAN1:RANG +40.0E+00;OFFS +0.00000E+00;COUP DC;IMP ONEM;DISP 1;BWL 0;
@@ -206,15 +207,15 @@ class Channel():
         to_bool = ["DISP", "BWL", "INV"]
         to_float = ["OFFS", "PROB", "PROB:SKEW", "RANG"]
         to_int = ["CHAN"]
-        for key in ch_setup_dict:
+        for key, value in ch_setup_dict.items():
             if key in to_str:
-                ch_setup_dict[key] = str(ch_setup_dict[key])
+                ch_setup_dict[key] = str(value)
             elif key in to_bool:
-                ch_setup_dict[key] = (ch_setup_dict[key] == "1")
+                ch_setup_dict[key] = (value == "1")
             elif key in to_float:
-                ch_setup_dict[key] = float(ch_setup_dict[key])
+                ch_setup_dict[key] = float(value)
             elif key in to_int:
-                ch_setup_dict[key] = int(ch_setup_dict[key])
+                ch_setup_dict[key] = int(value)
         return ch_setup_dict
 
 
@@ -414,7 +415,7 @@ class KeysightDSOX1102G(SCPIUnknownMixin, Instrument):
         # Other waveform formats raise UnicodeDecodeError
         self.waveform_format = "ascii"
 
-        data = self.values(":waveform:data?")
+        data = self.values(":waveform:data?", cast=cast_or_str(float))
         # Strip header from first data element
         data[0] = float(data[0][10:])
 
@@ -522,16 +523,16 @@ class KeysightDSOX1102G(SCPIUnknownMixin, Instrument):
         tb_setup_splitted = tb_setup_raw[5:].split(";")
 
         # Create dict of setup parameters
-        tb_setup = dict(map(lambda v: v.split(" "), tb_setup_splitted))
+        tb_setup: Mapping[str, str | float] = dict(map(lambda v: v.split(" "), tb_setup_splitted))
 
         # Convert values to specific type
         to_str = ["MODE", "REF"]
         to_float = ["MAIN:RANG", "POS"]
-        for key in tb_setup:
+        for key, value in tb_setup.items():
             if key in to_str:
-                tb_setup[key] = str(tb_setup[key])
+                tb_setup[key] = str(value)
             elif key in to_float:
-                tb_setup[key] = float(tb_setup[key])
+                tb_setup[key] = float(value)
 
         return tb_setup
 
@@ -541,8 +542,23 @@ class KeysightDSOX1102G(SCPIUnknownMixin, Instrument):
         """
         vals = self.values(":waveform:preamble?")
         # Get values to dict
-        vals_dict = dict(zip(["format", "type", "points", "count", "xincrement", "xorigin",
-                              "xreference", "yincrement", "yorigin", "yreference"], vals))
+        vals_dict: Mapping[str, str | float] = dict(
+            zip(
+                [
+                    "format",
+                    "type",
+                    "points",
+                    "count",
+                    "xincrement",
+                    "xorigin",
+                    "xreference",
+                    "yincrement",
+                    "yorigin",
+                    "yreference",
+                ],
+                vals,
+            )
+        )
         # Map element values
         format_map = {0: "BYTE", 1: "WORD", 4: "ASCII"}
         type_map = {0: "NORMAL", 1: "PEAK DETECT", 2: "AVERAGE", 3: "HRES"}
@@ -552,10 +568,10 @@ class KeysightDSOX1102G(SCPIUnknownMixin, Instrument):
         # Correct types
         to_int = ["points", "count", "xreference", "yreference"]
         to_float = ["xincrement", "xorigin", "yincrement", "yorigin"]
-        for key in vals_dict:
+        for key, value in vals_dict.items():
             if key in to_int:
-                vals_dict[key] = int(vals_dict[key])
+                vals_dict[key] = int(value)
             elif key in to_float:
-                vals_dict[key] = float(vals_dict[key])
+                vals_dict[key] = float(value)
 
         return vals_dict

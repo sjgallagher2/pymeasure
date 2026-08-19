@@ -29,10 +29,11 @@
 # tested with a PTW UNIDOS Tango dosemeter
 
 
-import pytest
-from pymeasure.instruments.ptw.ptwUNIDOS import ptwUNIDOS
 from time import sleep
 
+import pytest
+
+from pymeasure.instruments.ptw.ptwUNIDOS import ptwUNIDOS
 
 RANGES = ["VERY_LOW", "LOW", "MEDIUM", "HIGH"]
 LEVELS = ["LOW", "MEDIUM", "HIGH"]
@@ -175,7 +176,7 @@ class TestPTWUnidosMethods:
     def test_interval_measurement(self, unidos, time):
         unidos.interval_measurement(time)
         sleep(0.1 * time)
-        assert unidos.status in ["INT"]
+        assert unidos.status == "INT"
         assert unidos.integration_time == time
 
 

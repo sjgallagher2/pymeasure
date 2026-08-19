@@ -23,9 +23,12 @@
 #
 
 import logging
+
 from pymeasure.instruments import Instrument, SCPIUnknownMixin
 from pymeasure.instruments.validators import (
-    strict_discrete_set, truncated_discrete_set, truncated_range
+    strict_discrete_set,
+    truncated_discrete_set,
+    truncated_range,
 )
 
 log = logging.getLogger(__name__)
@@ -105,7 +108,7 @@ class YokogawaGS200(SCPIUnknownMixin, Instrument):
                 "error."
             )
         else:
-            self.write("SOURce:LEVel %g" % level)
+            self.write(f"SOURce:LEVel {level:g}")
 
     def trigger_ramp_to_level(self, level, ramp_time):
         """

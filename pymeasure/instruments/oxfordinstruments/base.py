@@ -23,12 +23,13 @@
 #
 
 
-from pymeasure.instruments import Instrument
-from pyvisa.errors import VisaIOError
-from pyvisa import constants as vconst
-import re
 import logging
+import re
 
+from pyvisa import constants as vconst
+from pyvisa.errors import VisaIOError
+
+from pymeasure.instruments import Instrument
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -61,7 +62,6 @@ class OxfordInstrumentsBase(Instrument):
 
         super().__init__(adapter,
                          name=name,
-                         includeSCPI=False,
                          asrl={
                              'baud_rate': 9600,
                              'data_bits': 8,
@@ -125,7 +125,7 @@ class OxfordInstrumentsBase(Instrument):
         """
         super().write(command)
 
-        if not command[0] == "$":
+        if command[0] != "$":
             response = self.read()
 
             log.debug(
@@ -172,10 +172,10 @@ class OxfordInstrumentsBase(Instrument):
         except TypeError:
             match = False
 
-        if match and not match.groups()[0] == command[0]:
+        if match and match.groups()[0] != command[0]:
             match = False
 
         return bool(match)
 
     def __repr__(self):
-        return "<OxfordInstrumentsAdapter(adapter='%s')>" % self.adapter.connection.resource_name
+        return f"<OxfordInstrumentsAdapter(adapter='{self.adapter.connection.resource_name}')>"

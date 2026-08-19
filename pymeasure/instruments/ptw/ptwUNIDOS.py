@@ -23,15 +23,15 @@
 #
 
 
-import logging
 import json
+import logging
 import warnings
-from typing import Any, Union, Optional
+from typing import Any
 
 from pymeasure.adapters import Adapter
 from pymeasure.instruments import Instrument
-from pymeasure.instruments.validators import (strict_discrete_set,
-                                              strict_range)
+from pymeasure.instruments.common_base import cast_or_str
+from pymeasure.instruments.validators import strict_discrete_set, strict_range
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -41,14 +41,13 @@ class ptwUNIDOS(Instrument):
     """A class representing the PTW UNIDOS Tango/Romeo dosemeters."""
 
     def __init__(self,
-                 adapter: Union[Adapter, int, str],
+                 adapter: Adapter | int | str,
                  name: str = "PTW UNIDOS dosemeter",
                  **kwargs: Any) -> None:
         super().__init__(
             adapter,
             name,
             read_termination="\r\n",
-            includeSCPI=False,
             timeout=20000,
             encoding="utf8",
             **kwargs
@@ -91,14 +90,14 @@ wrong format of the parameter",
                 "E96": "Timeout"
                 }
 
-            if error_code in errors.keys():
+            if error_code in errors:
                 error_text = f"{error_code}, {errors[error_code]}"
                 raise ValueError(error_text)
             else:
                 raise ConnectionError(f"Unknown read error. Received: {got}")
 
         else:
-            command, sep, response = got.partition(";")  # command is removed from response
+            _command, _sep, response = got.partition(";")  # command is removed from response
             return response.replace(";", ",")
 
     def check_set_errors(self) -> list[str]:
@@ -135,9 +134,8 @@ wrong format of the parameter",
         err_code = int(flags, 0)
 
         for n in range(len(err_txt)):
-            if err_code & (2**n):
-                if err_txt[n] is not None:
-                    err_msg.append(err_txt[n])
+            if err_code & (2**n) and err_txt[n] is not None:
+                err_msg.append(err_txt[n])
 
         return err_msg
 
@@ -153,13 +151,13 @@ wrong format of the parameter",
         self.ask("CHR")
 
     def hold(self) -> None:
-        """Set the measurment to HOLD state.
+        """Set the measurement to HOLD state.
 
         .. note:: Write permission is required.
         """
         self.ask("HLD")
 
-    def intervall(self, intervall: Optional[int] = None) -> None:
+    def intervall(self, intervall: int | None = None) -> None:
         """Execute an interval measurement.
 
         .. deprecated:: 0.16.0
@@ -171,7 +169,7 @@ wrong format of the parameter",
             )
         return self.interval_measurement(intervall)
 
-    def interval_measurement(self, interval: Optional[int] = None) -> None:
+    def interval_measurement(self, interval: int | None = None) -> None:
         """Execute an interval measurement.
 
         :param interval: optional, measurement interval in seconds
@@ -232,7 +230,8 @@ wrong format of the parameter",
         """,
         validator=strict_discrete_set,
         values=["LOW", "MEDIUM", "HIGH"],
-        check_set_errors=True
+        check_set_errors=True,
+        cast=str,
         )
 
     id = Instrument.measurement(
@@ -240,7 +239,8 @@ wrong format of the parameter",
         """Get the dosemeter ID (list[str]).
 
         .. [name, type number, firmware version, hardware revision]
-        """
+        """,
+        cast=str,
         )
 
     integration_time = Instrument.control(
@@ -256,7 +256,8 @@ wrong format of the parameter",
 
     mac_address = Instrument.measurement(
         "MAC",
-        """Get the dosemeter MAC address (str)."""
+        """Get the dosemeter MAC address (str).""",
+        cast=str,
         )
 
     measurement_result = Instrument.measurement(
@@ -273,6 +274,7 @@ wrong format of the parameter",
                     ``voltage``,
                     ``error``
         """,
+        cast=cast_or_str(float),
         get_process_list=lambda v: {
             "status": v[0],
             "charge": float(str(v[1]) + str(v[2])),
@@ -293,7 +295,8 @@ wrong format of the parameter",
         """,
         validator=strict_discrete_set,
         values=["VERY_LOW", "LOW", "MEDIUM", "HIGH"],
-        check_set_errors=True
+        check_set_errors=True,
+        cast=str,
         )
 
     range_max = Instrument.measurement(
@@ -305,6 +308,7 @@ wrong format of the parameter",
                     ``doserate``,
                     ``timebase``
         """,
+        cast=cast_or_str(float),
         get_process_list=lambda v: {
             "range": v[0],
             "current": float(str(v[1]) + str(v[2])),
@@ -324,6 +328,7 @@ wrong format of the parameter",
                     ``doserate``,
                     ``timebase``
         """,
+        cast=cast_or_str(float),
         get_process_list=lambda v: {
             "range": v[0],
             "charge": float(str(v[1]) + str(v[2])),
@@ -345,6 +350,7 @@ wrong format of the parameter",
                     ``medium``,
                     ``high``
         """,
+        cast=cast_or_str(float),
         get_process_list=lambda v: {
             "status": v[0],
             "time_remaining": v[1],
@@ -369,7 +375,8 @@ wrong format of the parameter",
         ``MEAS``, ``HOLD``, ``INT``, ``INTHLD``, ``ZERO``, ``AUTO``,
         ``AUTO_MEAS``, ``AUTO_HOLD``, ``EOM``, ``WAIT``, ``INIT``,
         ``ERROR``, ``SELF_TEST`` or ``TST``
-        """
+        """,
+        cast=str,
         )
 
     tfi = Instrument.measurement(
@@ -377,7 +384,8 @@ wrong format of the parameter",
         """Get the telegram failure information (str).
 
         The property provides information about the last failed command with HTTP request.
-        """
+        """,
+        cast=str,
         )
 
     autostart_enabled = Instrument.control(
@@ -386,7 +394,8 @@ wrong format of the parameter",
         validator=strict_discrete_set,
         map_values=True,
         values={True: "true", False: "false"},
-        check_set_errors=True
+        check_set_errors=True,
+        cast=str,
         )
 
     autoreset_enabled = Instrument.control(
@@ -395,7 +404,8 @@ wrong format of the parameter",
         validator=strict_discrete_set,
         map_values=True,
         values={True: "true", False: "false"},
-        check_set_errors=True
+        check_set_errors=True,
+        cast=str,
         )
 
     electrical_units_enabled = Instrument.control(
@@ -404,7 +414,8 @@ wrong format of the parameter",
         validator=strict_discrete_set,
         map_values=True,
         values={True: "true", False: "false"},
-        check_set_errors=True
+        check_set_errors=True,
+        cast=str,
         )
 
     voltage = Instrument.control(
@@ -430,9 +441,10 @@ wrong format of the parameter",
         validator=strict_discrete_set,
         values=[True, False],
         set_process=lambda v: "" if (v) else f";{int(v)}",  # "TOK" = request write permission
-                                                            # "TOK;0" = release write permision
+                                                            # "TOK;0" = release write permission
                                                             # "TOK;1" = get status
-        get_process_list=lambda v: True if (v[1] == "true") else False,
+        cast=str,
+        get_process_list=lambda v: v[1] == "true",
         check_set_errors=True
         )
 
@@ -444,6 +456,7 @@ wrong format of the parameter",
                      ``time_remaining``,
                      ``time_total``
         """,
+        cast=cast_or_str(float),
         get_process_list=lambda v: {"status": v[0], "time_remaining": v[1], "time_total": v[2]},
     )
 
@@ -452,7 +465,7 @@ wrong format of the parameter",
 # only read access is implemented #
 ###################################
 
-    def read_detector(self, guid: str = "ALL") -> Union[dict, list[dict]]:
+    def read_detector(self, guid: str = "ALL") -> dict | list[dict]:
         """Read the properties of the requested detector.
 
         :param str guid: optional, ID of the detector. A list of all
@@ -490,7 +503,7 @@ wrong format of the parameter",
         if guid.upper() in ["", "ALL"]:
             d_rec = self.ask("RDA")
         else:
-            guid, comma, d_rec = self.ask(f"RDR;{guid}").partition(",")
+            guid, _comma, d_rec = self.ask(f"RDR;{guid}").partition(",")
 
         return json.loads(d_rec)  # str -> dict
 
@@ -502,6 +515,7 @@ wrong format of the parameter",
                     ``ipv4``,
                     ``ipv6``
         """,
+        cast=cast_or_str(float),
         get_process_list=lambda v: json.loads(",".join(v))  # list -> str -> dict
         )
 
@@ -540,6 +554,7 @@ wrong format of the parameter",
                     ``triggerReset``,
                     ``triggerSensitivity``
         """,
+        cast=cast_or_str(float),
         get_process_list=lambda v: json.loads(",".join(v))  # list -> str -> dict
         )
 
@@ -560,6 +575,7 @@ wrong format of the parameter",
                     ``testTemperature``,
                     ``typeNumber``
         """,
+        cast=cast_or_str(float),
         get_process_list=lambda v: json.loads(",".join(v))  # list -> str -> dict
         )
 
@@ -577,6 +593,7 @@ wrong format of the parameter",
                     ``timezone``,
                     ``volume``
         """,
+        cast=cast_or_str(float),
         get_process_list=lambda v: json.loads(",".join(v))  # list -> str -> dict
         )
 
@@ -587,5 +604,6 @@ wrong format of the parameter",
         :dict keys: ``enabled``,
                     ``ssid``
         """,
+        cast=cast_or_str(float),
         get_process_list=lambda v: json.loads(",".join(v))  # list -> str -> dict
         )

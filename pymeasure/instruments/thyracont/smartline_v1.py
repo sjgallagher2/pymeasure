@@ -22,8 +22,8 @@
 # THE SOFTWARE.
 #
 
-from pymeasure.instruments.validators import strict_discrete_set
 from pymeasure.instruments import Instrument
+from pymeasure.instruments.validators import strict_discrete_set
 
 
 def calculate_checksum(msg):
@@ -59,7 +59,7 @@ class SmartlineV1(Instrument):
 
     :param adapter: pyvisa resource name of the instrument or adapter instance
     :param string name: Name of the instrument.
-    :param int address: RS485 adddress of the instrument 1-15.
+    :param int address: RS485 address of the instrument 1-15.
     :param int baud_rate: baudrate used for the communication with the device.
     :param kwargs: Any valid key-word argument for Instrument
 
@@ -71,10 +71,9 @@ class SmartlineV1(Instrument):
                  baud_rate=9600, **kwargs):
         super().__init__(adapter,
                          name,
-                         includeSCPI=False,
                          write_termination="\r",
                          read_termination="\r",
-                         asrl=dict(baud_rate=baud_rate),
+                         asrl={"baud_rate": baud_rate},
                          **kwargs)
         self.address = address
 

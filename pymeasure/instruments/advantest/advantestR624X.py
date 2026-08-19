@@ -25,9 +25,9 @@
 import logging
 from enum import IntEnum, IntFlag
 from warnings import warn
-from pymeasure.instruments import Instrument, Channel
-from pymeasure.instruments.validators import truncated_range, strict_discrete_set, \
-    strict_range
+
+from pymeasure.instruments import Channel, Instrument
+from pymeasure.instruments.validators import strict_discrete_set, strict_range, truncated_range
 
 # Setup logging
 log = logging.getLogger(__name__)
@@ -195,7 +195,7 @@ class SequenceInterruptionType(IntEnum):
 
 
 class DOR(IntFlag):
-    """ bit assigment for the Device Operation Register (DOR):
+    """ bit assignment for the Device Operation Register (DOR):
 
         =========  ==========================
         Bit (dec)  Description
@@ -234,7 +234,7 @@ class DOR(IntFlag):
 
 
 class COR(IntFlag):
-    """ bit assigment for the Channel Operations Register (COR):
+    """ bit assignment for the Channel Operations Register (COR):
 
         =========  =============================================
         Bit (dec)  Description
@@ -275,7 +275,7 @@ class COR(IntFlag):
 
 
 class SRER(IntFlag):
-    """ bit assigment for the Service Request Enable Register (SRER):
+    """ bit assignment for the Service Request Enable Register (SRER):
 
         =========  ===========================================================
         Bit (dec)  Description
@@ -309,7 +309,7 @@ class SRER(IntFlag):
 
 
 class SESR(IntFlag):
-    """ bit assigment for the Standard Event Status Register (SESR):
+    """ bit assignment for the Standard Event Status Register (SESR):
 
         =========  ==========================
         Bit (dec)  Description
@@ -342,7 +342,7 @@ class SESR(IntFlag):
 
 
 class TriggerOutputSignalTiming(IntFlag):
-    """ bit assigment for the timing of the trigger output signal
+    """ bit assignment for the timing of the trigger output signal
        output from TRIGGER OUT on the rear panel:
 
         =========  =============================
@@ -965,7 +965,7 @@ class AdvantestR624X(Instrument):
     """
 
     def __init__(self, adapter, name="R624X Source meter Base Class", **kwargs):
-        super().__init__(adapter, name, includeSCPI=False, **kwargs)
+        super().__init__(adapter, name, **kwargs)
         self.sequence = []
         self.store_to_sequence = False
         self.sequence_line_count = 0
@@ -1384,8 +1384,7 @@ class AdvantestR624X(Instrument):
 
         """
         program_number = truncated_range(program_number, [1, 20])
-        if command.endswith(';'):
-            command = command[:-1]
+        command = command.removesuffix(';')
         for subcmd in command.split(';'):
             prefix = subcmd.strip().split()[0].lower() if subcmd.strip() else ''
             if prefix and prefix not in HIGHSPEED_SEQUENCE_COMMANDS:
@@ -1755,7 +1754,7 @@ class AdvantestR624X(Instrument):
         :type: int
         """,
         validator=strict_range,
-        values=range(0, 5),
+        values=range(5),
     )
 
     load_config = Instrument.setting(
@@ -1765,7 +1764,7 @@ class AdvantestR624X(Instrument):
         :type: int
         """,
         validator=strict_range,
-        values=range(0, 5),
+        values=range(5),
     )
 
     def set_lo_common_connection_relay(self, enable, lo_relay=None):
@@ -1935,7 +1934,7 @@ class SMUChannel(Channel):
 
         """,
         validator=strict_range,
-        values=range(0, 63),
+        values=range(63),
         # get_process=lambda v: TriggerOutputSignalTiming(int(v)),
     )
 
@@ -2874,7 +2873,7 @@ class SMUChannel(Channel):
         "coc_0{ch}?",
         """Measure the Channel Operations Register (COR) as
         a :class:`COR` ``IntFlag`` (``COC?``).""",
-        values=range(0, 65535),
+        values=range(65535),
         get_process=lambda v: COR(int(v)),
     )
 
@@ -2884,7 +2883,7 @@ class SMUChannel(Channel):
         """Control the channel operation output enable register (COER) as
         a :class:`COR` ``IntFlag`` (``COE?``).""",
         validator=strict_range,
-        values=range(0, 65535),
+        values=range(65535),
         get_process=lambda v: COR(int(v)),
     )
 

@@ -1,3 +1,4 @@
+# ruff: file-ignore[TRY004]
 #
 # This file is part of the PyMeasure package.
 #
@@ -24,15 +25,16 @@
 
 import math
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
+
+from pyvisa.errors import VisaIOError
 
 from pymeasure.instruments import Instrument
 from pymeasure.instruments.generic_types import SCPIMixin
 from pymeasure.instruments.validators import strict_discrete_set, strict_range
-from pyvisa.errors import VisaIOError
 
 
-def _normalize_inf_input(value):
+def _normalize_inf_input(value: float | str) -> float | str:
     """Normalize INF-like setter values.
 
     :param value: Input value from user code.
@@ -177,6 +179,7 @@ class Keysight33250A(SCPIMixin, Instrument):
         """Control the output waveform shape.""",
         validator=strict_discrete_set,
         values=["SIN", "SQU", "RAMP", "PULS", "NOIS", "DC", "USER"],
+        cast=str,
         check_set_errors=True,
         check_get_errors=True,
     )
@@ -206,6 +209,7 @@ class Keysight33250A(SCPIMixin, Instrument):
         """Control the output amplitude unit.""",
         validator=strict_discrete_set,
         values=["VPP", "VRMS", "DBM"],
+        cast=str,
         check_set_errors=True,
         check_get_errors=True,
     )
@@ -328,6 +332,7 @@ class Keysight33250A(SCPIMixin, Instrument):
         """Control the output polarity (string, strict from NORM, INV).""",
         validator=strict_discrete_set,
         values=["NORM", "INV"],
+        cast=str,
         check_set_errors=True,
         check_get_errors=True,
     )
@@ -357,6 +362,7 @@ class Keysight33250A(SCPIMixin, Instrument):
         """Control the burst mode.""",
         validator=strict_discrete_set,
         values=["TRIG", "GAT"],
+        cast=str,
         check_set_errors=True,
         check_get_errors=True,
     )
@@ -395,6 +401,7 @@ class Keysight33250A(SCPIMixin, Instrument):
         """Control the external trigger slope (string, strict from POS, NEG).""",
         validator=strict_discrete_set,
         values=["POS", "NEG"],
+        cast=str,
         check_set_errors=True,
         check_get_errors=True,
     )
@@ -414,6 +421,7 @@ class Keysight33250A(SCPIMixin, Instrument):
         """Control the trigger output slope (string, strict from POS, NEG).""",
         validator=strict_discrete_set,
         values=["POS", "NEG"],
+        cast=str,
         check_set_errors=True,
         check_get_errors=True,
     )
@@ -423,6 +431,7 @@ class Keysight33250A(SCPIMixin, Instrument):
         """Control the trigger source.""",
         validator=strict_discrete_set,
         values=["IMM", "EXT", "BUS"],
+        cast=str,
         check_set_errors=True,
         check_get_errors=True,
     )
@@ -433,7 +442,7 @@ class Keysight33250A(SCPIMixin, Instrument):
 
     def wait_for_trigger(
         self,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
         should_stop: Callable[[], bool] = lambda: False,
     ) -> None:
         """Wait until the triggering has finished.

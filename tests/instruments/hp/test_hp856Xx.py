@@ -25,13 +25,27 @@ from datetime import datetime
 
 import pytest
 
-from pymeasure.test import expected_protocol
-
 from pymeasure.instruments.hp import HP8560A, HP8561B
-from pymeasure.instruments.hp.hp856Xx import Trace, MixerMode, CouplingMode, DemodulationMode, \
-    DetectionModes, AmplitudeUnits, HP856Xx, ErrorCode, FrequencyReference, PeakSearchMode, \
-    StatusRegister, SourceLevelingControlMode, SweepCoupleMode, SweepOut, TraceDataFormat, \
-    TriggerMode, WindowType
+from pymeasure.instruments.hp.hp856Xx import (
+    AmplitudeUnits,
+    CouplingMode,
+    DemodulationMode,
+    DetectionModes,
+    ErrorCode,
+    FrequencyReference,
+    HP856Xx,
+    MixerMode,
+    PeakSearchMode,
+    SourceLevelingControlMode,
+    StatusRegister,
+    SweepCoupleMode,
+    SweepOut,
+    Trace,
+    TraceDataFormat,
+    TriggerMode,
+    WindowType,
+)
+from pymeasure.test import expected_protocol
 
 
 class TestHP856Xx:
@@ -147,8 +161,8 @@ class TestHP856Xx:
     def test_frequencies(self, function, command, hp_derivat, max_freq):
         with expected_protocol(
                 hp_derivat,
-                [("%s %.11E Hz" % (command, max_freq), None),
-                 ("%s?" % command, '%.11E' % max_freq)]
+                [(f"{command} {max_freq:.11E} Hz", None),
+                 (f"{command}?", f'{max_freq:.11E}')]
         ) as instr:
             setattr(instr, function, max_freq)
             assert getattr(instr, function) == max_freq
@@ -229,7 +243,7 @@ class TestHP856Xx:
                     ("DL " + string_params, None)
                 ]
         ) as instr:
-            instr.display_line_enabled = True if string_params == "ON" else False
+            instr.display_line_enabled = string_params == "ON"
 
     def test_check_done(self):
         with expected_protocol(
@@ -272,14 +286,14 @@ class TestHP856Xx:
     def test_fdiag_frequencies(self, function, command):
         with expected_protocol(
                 HP856Xx,
-                [("FDIAG %s,?" % command, '%.11E' % 2.8E8)]
+                [(f"FDIAG {command},?", f'{2.8E8:.11E}')]
         ) as instr:
             assert getattr(instr, function) == 2.8E8
 
     def test_sampler_harmonic_number(self):
         with expected_protocol(
                 HP856Xx,
-                [("FDIAG HARM,?", '%.11E' % 1.40000000000E1)]
+                [("FDIAG HARM,?", f'{1.40000000000E1:.11E}')]
         ) as instr:
             assert instr.sampler_harmonic_number == 14
 
@@ -345,7 +359,7 @@ class TestHP856Xx:
         with expected_protocol(
                 HP856Xx,
                 [("ADJIF 1", None),
-                 ("ADJIF %s" % cmd, None),
+                 (f"ADJIF {cmd}", None),
                  ("ADJIF?", "1")]
         ) as instr:
             instr.adjust_if = True
@@ -399,7 +413,7 @@ class TestHP856Xx:
         with expected_protocol(
                 HP856Xx,
                 [
-                    ("MKD %.11E Hz" % 28, None),
+                    (f"MKD {28:.11E} Hz", None),
                     ("MKD?", 2.8e7)
                 ]
         ) as instr:
@@ -410,7 +424,7 @@ class TestHP856Xx:
         with expected_protocol(
                 HP856Xx,
                 [
-                    ("MKF %.11E Hz" % 1, None),
+                    (f"MKF {1:.11E} Hz", None),
                     ("MKF?", 0.5)
                 ]
         ) as instr:
@@ -432,7 +446,7 @@ class TestHP856Xx:
         with expected_protocol(
                 HP856Xx,
                 [
-                    ("MKFCR %d Hz" % 1e3, None),
+                    (f"MKFCR {1e3:.0f} Hz", None),
                     ("MKFCR?", 1e4)
                 ]
         ) as instr:
@@ -444,7 +458,7 @@ class TestHP856Xx:
         with expected_protocol(
                 HP856Xx,
                 [
-                    ("MKOFF%s" % cmdstring, None),
+                    (f"MKOFF{cmdstring}", None),
                 ]
         ) as instr:
             instr.deactivate_marker(all_markers)
@@ -462,7 +476,7 @@ class TestHP856Xx:
                 HP856Xx,
                 [
                     ("AUNITS?", "DBM"),
-                    ("MKPT %d DBM" % -30, None),
+                    (f"MKPT {-30} DBM", None),
                     ("MKPT?", -70)
                 ]
         ) as instr:
@@ -473,7 +487,7 @@ class TestHP856Xx:
         with expected_protocol(
                 HP856Xx,
                 [
-                    ("MKPX %g DB" % 10.3, None),
+                    (f"MKPX {10.3:g} DB", None),
                     ("MKPX?", 10.3)
                 ]
         ) as instr:
@@ -484,7 +498,7 @@ class TestHP856Xx:
         with expected_protocol(
                 HP856Xx,
                 [
-                    ("MKT %gS" % 10.3, None),
+                    (f"MKT {10.3:g}S", None),
                     ("MKT?", 10.3)
                 ]
         ) as instr:
@@ -664,7 +678,7 @@ class TestHP856Xx:
         with expected_protocol(
                 HP856Xx,
                 [
-                    ("SP %s" % param, None)
+                    (f"SP {param}", None)
                 ]
         ) as instr:
             instr.span = param
@@ -675,7 +689,7 @@ class TestHP856Xx:
                 HP856Xx,
                 [("AUNITS?", "DBM"),
                  ("SQUELCH 10 DBM", None),
-                 ("SQUELCH %s" % string_params, None),
+                 (f"SQUELCH {string_params}", None),
                  ("SQUELCH?", "10")]
         ) as instr:
             instr.squelch = 10
@@ -752,7 +766,7 @@ class TestHP856Xx:
     def test_title(self):
         with expected_protocol(
                 HP856Xx,
-                [("TITLE@%s@" % "TestString", None)]
+                [(f"TITLE@{'TestString'}@", None)]
         ) as instr:
             instr.set_title("TestString")
 
@@ -1079,7 +1093,7 @@ class TestHP8561B:
         str_param, boolean = params
         with expected_protocol(
                 HP8561B,
-                [("HNLOCK %s" % str_param, None)]
+                [(f"HNLOCK {str_param}", None)]
         ) as instr:
             instr.harmonic_number_lock_enabled = boolean
 
@@ -1122,7 +1136,7 @@ class TestHP8561B:
         str_param, boolean = params
         with expected_protocol(
                 HP8561B,
-                [("MBIAS %s" % str_param, None)]
+                [(f"MBIAS {str_param}", None)]
         ) as instr:
             instr.mixer_bias_enabled = boolean
 

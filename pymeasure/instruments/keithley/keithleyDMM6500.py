@@ -24,11 +24,11 @@
 
 import logging
 
-from pymeasure.instruments import Instrument, Channel, SCPIMixin
+from pymeasure.instruments import Channel, Instrument, SCPIMixin, cast_or_str
 from pymeasure.instruments.validators import (
-    truncated_range,
-    truncated_discrete_set,
     strict_discrete_set,
+    truncated_discrete_set,
+    truncated_range,
 )
 
 log = logging.getLogger(__name__)
@@ -68,6 +68,7 @@ class ScannerCard2000Channel(Channel):
         validator=strict_discrete_set,
         values=MODES,
         map_values=True,
+        cast=str,
         get_process=lambda v: v.replace('"', ""),
     )
 
@@ -255,6 +256,7 @@ class KeithleyDMM6500(SCPIMixin, Instrument):
         """,
         validator=strict_discrete_set,
         values=["TSP", "SCPI", "SCPI2000", "SCPI34401"],
+        cast=str,
     )
     mode = Instrument.control(
         ":SENS:FUNC?",
@@ -268,6 +270,7 @@ class KeithleyDMM6500(SCPIMixin, Instrument):
         validator=strict_discrete_set,
         values=MODES,
         map_values=True,
+        cast=str,
         get_process=lambda v: v.replace('"', ""),
     )
 
@@ -378,6 +381,7 @@ class KeithleyDMM6500(SCPIMixin, Instrument):
         Valid values: 3, 30, 300, ``MIN``, ``DEF``, ``MAX``.""",
         validator=strict_discrete_set,
         values=[3, 30, 300, "MIN", "DEF", "MAX"],
+        cast=cast_or_str(float),
     )
 
     autozero_enabled = Instrument.control(
@@ -399,6 +403,7 @@ class KeithleyDMM6500(SCPIMixin, Instrument):
         Example: Using ``time`` package to set instrument's clock:
         ``dmm.system_time = time.strftime("%Y, %m, %d, %H, %M, %S")``
         """,
+        cast=str,
     )
 
     def trigger_single_autozero(self):
@@ -413,6 +418,7 @@ class KeithleyDMM6500(SCPIMixin, Instrument):
             Return can be ``FRONT`` or ``REAR``.""",
         values={"FRONT": "FRON", "REAR": "REAR"},
         map_values=True,
+        cast=str,
     )
 
     ###########
@@ -1102,7 +1108,7 @@ class KeithleyDMM6500(SCPIMixin, Instrument):
         """ Control the number of buffer points.
         This does not represent actual points in the buffer, but the configuration
         value instead. `0` means the largest buffer possible based on the available
-        memory when the bufer is created.""",
+        memory when the buffer is created.""",
         validator=truncated_range,
         values=[0, 6_000_000],
         cast=int,
@@ -1126,6 +1132,7 @@ class KeithleyDMM6500(SCPIMixin, Instrument):
         or ``SRE`` (single-precision).""",
         validator=strict_discrete_set,
         values=("ASC", "REAL", "SRE"),
+        cast=str,
     )
 
     ################
@@ -1136,6 +1143,7 @@ class KeithleyDMM6500(SCPIMixin, Instrument):
         ":SYST:CARD1:IDN?",
         """ Get scanner card's ID.""",
         separator="|",
+        cast=str,
     )
 
     scan_vch_start = Instrument.measurement(
@@ -1250,7 +1258,7 @@ class KeithleyDMM6500(SCPIMixin, Instrument):
     @property
     def scan_modes(self):
         """Get a dictionary of every channel's mode."""
-        res = dict()
+        res = {}
         for i in range(self.scan_vch_start, self.scan_vch_end + 1):
             res[i] = self.channels[i].mode
         return res
@@ -1266,10 +1274,7 @@ class KeithleyDMM6500(SCPIMixin, Instrument):
         completed.
         This property is used while running time-consuming scanning operation."""
         res = int(self.ask("*ESR?")) & 1
-        if res == 1:
-            return True
-        else:
-            return False
+        return res == 1
 
     def scan_start(self, block_communication=True, count=None, interval=None):
         """Start the scanner card to close each channel of :attr:`scan_channels` sequentially
@@ -1336,10 +1341,7 @@ class KeithleyDMM6500(SCPIMixin, Instrument):
             mode = self.mode
         if mode in self.MODES_HAVE_AUTORANGE:
             value = self.ask(f":SENS:{self._mode_command(mode)}:RANG:AUTO?")
-            if value == "1":
-                return True
-            else:
-                return False
+            return value == "1"
         else:
             return False
 

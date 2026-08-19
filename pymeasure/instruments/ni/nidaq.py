@@ -25,13 +25,14 @@
 # Requires 'instrumental' package: https://github.com/mabuchilab/Instrumental
 
 from instrumental.drivers.daq import ni
+
 from pymeasure.instruments import Instrument
 
 
 def get_dict_attr(obj, attr):
-    for obj in [obj] + obj.__class__.mro():
-        if attr in obj.__dict__:
-            return obj.__dict__[attr]
+    for obj_element in [obj] + obj.__class__.mro():
+        if attr in obj_element.__dict__:
+            return obj_element.__dict__[attr]
     raise AttributeError
 
 
@@ -45,7 +46,6 @@ class NIDAQ(Instrument):
         super().__init__(
             None,
             "NIDAQ",
-            includeSCPI=False,
             **kwargs)
         for chan in self._daq.get_AI_channels():
             self.add_property(chan)
@@ -55,8 +55,8 @@ class NIDAQ(Instrument):
     def add_property(self, chan, set=False):
         if set:
             def fset(self, value): return self.set_chan(chan, value)
-            def fget(self): return getattr(self, '_%s' % chan)
-            setattr(self, '_%s' % chan, None)
+            def fget(self): return getattr(self, f'_{chan}')
+            setattr(self, f'_{chan}', None)
             setattr(self.__class__, chan, property(fset=fset, fget=fget))
         else:
             def fget(self): return self.get_chan(chan)
@@ -67,5 +67,5 @@ class NIDAQ(Instrument):
         return getattr(self._daq, chan).read().magnitude
 
     def set_chan(self, chan, value):
-        setattr(self, '_%s' % chan, value)
-        getattr(self._daq, chan).write('%sV' % value)
+        setattr(self, f'_{chan}', value)
+        getattr(self._daq, chan).write(f'{value}V')

@@ -23,12 +23,12 @@
 #
 import logging
 import os
+from collections import ChainMap
 from functools import partial
 from inspect import signature
-from collections import ChainMap
 
-from ..Qt import QtCore, QtWidgets, QtGui
-from ...experiment.sequencer import SequenceHandler, SequenceEvaluationError
+from ...experiment.sequencer import SequenceEvaluationError, SequenceHandler
+from ..Qt import QtCore, QtGui, QtWidgets
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -99,10 +99,7 @@ class SequencerTreeModel(QtCore.QAbstractItemModel):
             This method is called implicitly by the QTreeView that is
             displaying us, as the way of finding out what to display where.
         """
-        if not index.isValid():
-            return
-
-        elif not role == QtCore.Qt.ItemDataRole.DisplayRole:
+        if not index.isValid() or role != QtCore.Qt.ItemDataRole.DisplayRole:
             return
 
         data = index.internalPointer()[index.column()]
@@ -364,7 +361,7 @@ class SequenceDialog(QtWidgets.QFileDialog):
 
     def update_preview(self, filename):
         if not os.path.isdir(filename) and filename != '':
-            with open(filename, 'r') as file_object:
+            with open(filename) as file_object:
                 data = SequenceHandler(file_obj=file_object)
             tree_model = SequencerTreeModel(data=data)
             self.preview_param.setModel(tree_model)
@@ -435,7 +432,7 @@ class SequencerWidget(QtWidgets.QWidget):
                       if key in self._inputs}
 
         self.names_inv = {name: key for key, name in self.names.items()}
-        self.names_choices = list(sorted(self.names_inv.keys()))
+        self.names_choices = sorted(self.names_inv.keys())
 
     def _setup_ui(self):
         self.tree = SequencerTreeView(self)
@@ -546,7 +543,7 @@ class SequencerWidget(QtWidgets.QWidget):
             log.error("Evaluation of one of the sequence strings went wrong, no sequence queued.")
         else:
             log.info(
-                "Queuing %d measurements based on the entered sequences." % len(sequence)
+                f"Queuing {len(sequence)} measurements based on the entered sequences."
             )
 
             for entry in sequence:
@@ -566,7 +563,7 @@ class SequencerWidget(QtWidgets.QWidget):
             filename = dialog.selectedFiles()[0]
             with open(filename, 'w') as file_object:
                 self.tree.save(file_object)
-            log.info('Saved sequence file %s' % filename)
+            log.info(f'Saved sequence file {filename}')
 
     def load_sequence(self, *, filename=None):
         """
@@ -585,6 +582,6 @@ class SequencerWidget(QtWidgets.QWidget):
             else:
                 return
 
-        with open(filename, 'r') as file_object:
+        with open(filename) as file_object:
             self.tree.model().load(file_object, append=append_flag)
         self.tree.expandAll()

@@ -22,7 +22,7 @@
 # THE SOFTWARE.
 #
 
-from pymeasure.instruments import Instrument, Channel, SCPIUnknownMixin
+from pymeasure.instruments import Channel, Instrument, SCPIUnknownMixin
 from pymeasure.instruments.validators import strict_discrete_set, strict_range
 
 
@@ -32,7 +32,9 @@ class PLChannel(Channel):
     Channels of the power supply. The channels are number from right-to-left, starting at 1.
     """
 
-    def __init__(self, parent, id, voltage_range: list = None, current_range: list = None):
+    def __init__(
+        self, parent, id, voltage_range: list | None = None, current_range: list | None = None
+    ):
         super().__init__(parent, id)
         self.voltage_setpoint_values = voltage_range
         self.current_limit_values = current_range
@@ -46,6 +48,7 @@ class PLChannel(Channel):
         values=[0, 6],
         dynamic=True,
         get_process=lambda x: float(x[3:]),
+        cast=str,
     )
 
     current_limit = Channel.control(
@@ -55,18 +58,21 @@ class PLChannel(Channel):
         values=[0, 1.5],
         dynamic=True,
         get_process=lambda x: float(x[3:]),
+        cast=str,
     )
 
     voltage = Channel.measurement(
         "V{ch}O?",
         """ Measure the output readback voltage for this output channel in Volts.""",
         get_process=lambda x: float(x[:-1]),
+        cast=str,
     )
 
     current = Channel.measurement(
         "I{ch}O?",
         """ Measure the output readback current for this output channel in Amps.""",
         get_process=lambda x: float(x[:-1]),
+        cast=str,
     )
 
     current_range = Channel.control(

@@ -24,14 +24,13 @@
 
 
 import logging
-from time import sleep, time
 from enum import IntFlag
+from time import sleep, time
 
 import numpy as np
 
 from pymeasure.instruments import Instrument
-from pymeasure.instruments.validators import strict_discrete_set, \
-    truncated_range, strict_range
+from pymeasure.instruments.validators import strict_discrete_set, strict_range, truncated_range
 
 from .base import OxfordInstrumentsBase
 
@@ -52,9 +51,9 @@ def pointer_validator(value, values):
     """
 
     if not isinstance(value, (list, tuple)):
-        raise TypeError('{:g} is not a list or tuple'.format(value))
+        raise TypeError(f'{value:g} is not a list or tuple')
     if not len(value) == 2:
-        raise IndexError('{:g} is not of length 2'.format(value))
+        raise IndexError(f'{value:g} is not of length 2')
     return tuple(strict_range(v, values) for v in value)
 
 

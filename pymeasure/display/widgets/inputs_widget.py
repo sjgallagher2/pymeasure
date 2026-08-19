@@ -23,13 +23,18 @@
 #
 
 import logging
-
 from functools import partial
 
-from ..inputs import (BooleanInput, IntegerInput, ListInput, ScientificInput,
-                      StringInput, VectorInput)
-from ..Qt import QtWidgets, QtCore
 from ...experiment import parameters
+from ..inputs import (
+    BooleanInput,
+    IntegerInput,
+    ListInput,
+    ScientificInput,
+    StringInput,
+    VectorInput,
+)
+from ..Qt import QtCore, QtWidgets
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -91,7 +96,7 @@ class InputsWidget(QtWidgets.QWidget):
         for name in self._inputs:
             if not isinstance(getattr(self, name), self.NO_LABEL_INPUTS):
                 label = QtWidgets.QLabel(self)
-                label.setText("%s:" % parameters[name].name)
+                label.setText(f"{parameters[name].name}:")
                 vbox.addWidget(label)
                 self.labels[name] = label
 

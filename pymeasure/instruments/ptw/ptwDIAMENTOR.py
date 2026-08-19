@@ -24,13 +24,12 @@
 
 
 import logging
-
-from typing import Any, Union
+from typing import Any
 
 from pymeasure.adapters import Adapter
 from pymeasure.instruments import Instrument
-from pymeasure.instruments.validators import (strict_discrete_set,
-                                              strict_range)
+from pymeasure.instruments.common_base import cast_or_str
+from pymeasure.instruments.validators import strict_discrete_set, strict_range
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -40,7 +39,7 @@ class ptwDIAMENTOR(Instrument):
     """A class representing the PTW DIAMENTOR DAP dosemeters."""
 
     def __init__(self,
-                 adapter: Union[Adapter, int, str],
+                 adapter: Adapter | int | str,
                  name: str = "PTW DIAMENTOR DAP dosemeter",
                  baud_rate: int = 9600,
                  **kwargs: Any) -> None:
@@ -48,7 +47,6 @@ class ptwDIAMENTOR(Instrument):
             adapter,
             name,
             baud_rate=baud_rate,
-            includeSCPI=False,
             timeout=2000,
             **kwargs
         )
@@ -75,7 +73,7 @@ class ptwDIAMENTOR(Instrument):
                 "E26": "Firmware malfunction"
                 }
 
-            if got in errors.keys():
+            if got in errors:
                 error_text = f"{got}, {errors[got]}"
                 raise ValueError(error_text)
             else:
@@ -119,7 +117,7 @@ class ptwDIAMENTOR(Instrument):
         """Control the baudrate
         (int, strictly ``9600``, ``19200``, ``38400``, ``57600`` or ``115200``).
 
-        The baudrate is changed after sending the respone.
+        The baudrate is changed after sending the response.
         """,
         map_values=True,
         validator=strict_discrete_set,
@@ -130,6 +128,7 @@ class ptwDIAMENTOR(Instrument):
                 115200: 4,
                 },
         check_set_errors=True,
+        cast=str,
         get_process=lambda v: int(v[2])
         )
 
@@ -138,19 +137,22 @@ class ptwDIAMENTOR(Instrument):
         """Get the DIAMENTOR electrical constancy check result (bool).""",
         map_values=True,
         values={True: "P", False: "F"},
+        cast=str,
         get_process=lambda v: v[1]
         )
 
     is_calibrated = Instrument.measurement(
         "CRC",
         """Get the calibration status (bool).""",
+        cast=cast_or_str(float),
         get_process_list=lambda v: not int(v[1])
         )
 
     is_eeprom_ok = Instrument.measurement(
         "CRC",
         """Get the EEPROM CRC ok status (bool).""",
-        get_process_list=lambda v: not int(v[0][3])
+        cast=cast_or_str(float),
+        get_process_list=lambda v: not int(v[0][3:])
         )
 
     pressure = Instrument.control(
@@ -164,7 +166,7 @@ class ptwDIAMENTOR(Instrument):
         values=[500, 1500],
         check_set_errors=True,
         get_process=lambda v: int(v[3:]),
-        cast=int
+        cast=str
         )
 
     id = Instrument.measurement(
@@ -173,6 +175,7 @@ class ptwDIAMENTOR(Instrument):
 
         Example response: ``CRS 2.33``
         """,
+        cast=str,
         )
 
     measurement = Instrument.measurement(
@@ -187,15 +190,17 @@ class ptwDIAMENTOR(Instrument):
         The units of ``dap`` and ``dap_rate`` depend on the :attr:`dap_unit` property.
         Time is in seconds.
         """,
+        cast=cast_or_str(float),
         get_process_list=lambda v: {"dap": float(v[0][1:]),
                                     "dap_rate": float(v[1]),
                                     "time": 60*int(v[2]) + int(v[3])
-                                    }
+                                    },
         )
 
     serial_number = Instrument.measurement(
         "SER",
         """Get the serial number (int).""",
+        cast=str,
         get_process=lambda v: int(v[3:])
         )
 
@@ -210,7 +215,7 @@ class ptwDIAMENTOR(Instrument):
         values=[0, 70],
         check_set_errors=True,
         get_process=lambda v: int(v[4:]),
-        cast=int
+        cast=str
         )
 
     dap_unit = Instrument.control(
@@ -231,6 +236,7 @@ class ptwDIAMENTOR(Instrument):
                 "Rcm2": 4,
                 },
         check_set_errors=True,
+        cast=str,
         get_process=lambda v: int(v[1:])
         )
 
@@ -253,6 +259,7 @@ class ptwDIAMENTOR(Instrument):
         values=[1E8, 9.999E12],
         check_set_errors=True,
         set_process=lambda v: f"{v:.4E}".replace('+', ''),  # remove '+' from scientific notation
+        cast=str,
         get_process=lambda v: float(v[2:])
         )
 
@@ -264,5 +271,6 @@ class ptwDIAMENTOR(Instrument):
         validator=strict_range,
         values=[0, 9.999],
         check_set_errors=True,
+        cast=str,
         get_process=lambda v: float(v[3:])
         )

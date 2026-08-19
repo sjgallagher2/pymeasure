@@ -34,10 +34,9 @@ log.addHandler(logging.NullHandler())
 
 class SequenceEvaluationError(Exception):
     """Raised when the evaluation of a sequence string goes wrong."""
-    pass
 
 
-class SequenceItem(object):
+class SequenceItem:
     """ Class representing a sequence row """
     column_map = {
         0: "level",
@@ -164,26 +163,24 @@ class SequenceHandler:
             except TypeError:
                 if log_enabled:
                     log.error("TypeError, likely a typo in one of the " +
-                              "functions for parameter '{}', depth {}".format(
-                                  name, depth
-                              ))
+                              f"functions for parameter '{name}', depth {depth}")
                 raise SequenceEvaluationError("TypeError, likely a typo")
             except SyntaxError:
                 if log_enabled:
                     log.error("SyntaxError, likely unbalanced brackets " +
-                              "for parameter '{}', depth {}".format(name, depth))
+                              f"for parameter '{name}', depth {depth}")
                 raise SequenceEvaluationError("SyntaxError, likely unbalanced brackets")
             except ValueError:
                 if log_enabled:
                     log.error("ValueError, likely wrong function argument " +
-                              "for parameter '{}', depth {}".format(name, depth))
+                              f"for parameter '{name}', depth {depth}")
                 raise SequenceEvaluationError("ValueError, likely wrong function argument")
             except Exception as e:
-                raise SequenceEvaluationError(e)
+                raise SequenceEvaluationError(e) from e
         else:
             if log_enabled:
                 log.error("No sequence entered for " +
-                          "for parameter '{}', depth {}".format(name, depth))
+                          f"for parameter '{name}', depth {depth}")
             raise SequenceEvaluationError("No sequence entered")
 
         evaluated_string = np.array(evaluated_string)

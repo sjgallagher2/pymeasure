@@ -22,12 +22,13 @@
 # THE SOFTWARE.
 
 import logging
-from time import time, sleep
+from time import sleep, time
+
+from pyvisa.util import from_binary_block
 
 from pymeasure.instruments import Instrument, SCPIMixin
 from pymeasure.instruments.channel import Channel
 from pymeasure.instruments.validators import strict_discrete_set, strict_range
-from pyvisa.util import from_binary_block
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -267,6 +268,7 @@ class AQ6370Series(SCPIMixin, Instrument):
         validator=strict_discrete_set,
         values={True: "ON", False: "OFF"},
         map_values=True,
+        cast=str,
     )
 
     resolution_bandwidth = Instrument.control(
@@ -285,6 +287,7 @@ class AQ6370Series(SCPIMixin, Instrument):
         ":TRACe:ACTive?",
         ":TRACe:ACTive %d",
         "Control the active trace (str 'A', 'B', 'C', ...).",
+        cast=str,
     )
 
     def copy_trace(self, source, destination):
@@ -353,6 +356,7 @@ class AQ6370Series(SCPIMixin, Instrument):
         ":FORMat:DATA %s",
         """Control the data transfer format. It returns to default ASCII at reset.""",
         values=["ASCII", "REAL,32", "REAL,64"],
+        cast=str,
     )
 
     def get_binary_data(self, bitness=64):
@@ -390,8 +394,6 @@ class AQ6370E(AQ6370Series):
         in dBm. The sensitivity closest to that level, and the sweep speed are automatically
         selected.""",
     )
-
-    pass
 
 
 class AQ6370D(AQ6370Series):

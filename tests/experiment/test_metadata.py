@@ -49,7 +49,7 @@ def test_metadata_formatting():
 def test_metadata_notset():
     p = Metadata('Test')
     with pytest.raises(ValueError):
-        p.value
+        _ = p.value
 
 
 def test_metadata_object_replacement():
@@ -74,7 +74,7 @@ def test_metadata_fget_evaluation():
     def test_method():
         return "teststring"
 
-    class TestAttribute():
+    class TestAttribute:
         def callable(self):
             return 84
 

@@ -22,12 +22,13 @@
 # THE SOFTWARE.
 #
 
-from pymeasure.instruments import Instrument, SCPIMixin
-from pymeasure.instruments.validators import truncated_range
-
 from io import StringIO
+
 import numpy as np
 import pandas as pd
+
+from pymeasure.instruments import Instrument, SCPIMixin
+from pymeasure.instruments.validators import truncated_range
 
 
 class AgilentE4408B(SCPIMixin, Instrument):
@@ -89,7 +90,7 @@ class AgilentE4408B(SCPIMixin, Instrument):
         """
         self.write(":FORMat:TRACe:DATA ASCII;")
         data = np.loadtxt(
-            StringIO(self.ask(":TRACE:DATA? TRACE%d;" % number)),
+            StringIO(self.ask(f":TRACE:DATA? TRACE{number};")),
             delimiter=',',
             dtype=np.float64
         )

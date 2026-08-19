@@ -23,12 +23,11 @@
 #
 
 import logging
-from typing import Union
 
-from pymeasure.instruments import Instrument
-from pymeasure.adapters import Adapter
 from pyvisa.constants import Parity
 
+from pymeasure.adapters import Adapter
+from pymeasure.instruments import Instrument
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -91,7 +90,7 @@ class TC038(Instrument):
 
     def __init__(
         self,
-        adapter: Union[Adapter, int, str],
+        adapter: Adapter | int | str,
         name: str = "TC038",
         address: int = 1,
         timeout: int = 1000,
@@ -104,7 +103,6 @@ class TC038(Instrument):
             write_termination="\r",
             read_termination="\r",
             parity=Parity.even,
-            includeSCPI=False,
             **kwargs,
         )
         self.address: int = address
@@ -154,26 +152,27 @@ class TC038(Instrument):
         "WRD" + registers["setpoint"] + ",01",
         "WWR" + registers["setpoint"] + ",01,%s",
         """Control the setpoint of the temperature controller in °C.""",
-        get_process=_data_to_temp,
-        set_process=lambda temp: f"{int(round(temp * 10)):04X}",
+        cast=_data_to_temp,
+        set_process=lambda temp: f"{round(temp * 10):04X}",
         check_set_errors=True,
     )
 
     temperature = Instrument.measurement(
         "WRD" + registers["temperature"] + ",01",
         """Measure the current temperature in °C.""",
-        get_process=_data_to_temp,
+        cast=_data_to_temp,
     )
 
     monitored_value = Instrument.measurement(
         "WRM",
         """Measure the currently monitored value. For default it is the current
         temperature in °C.""",
-        get_process=_data_to_temp,
+        cast=_data_to_temp,
     )
 
     information = Instrument.measurement(
         "INF6",
         """Get the information about the device and its capabilities.""",
         get_process=lambda got: got[7:-1],
+        cast=str,
     )

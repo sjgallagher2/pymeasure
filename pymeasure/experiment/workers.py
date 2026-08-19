@@ -26,22 +26,23 @@ from __future__ import annotations
 import logging
 import time
 import traceback
+from collections.abc import Sequence
 from queue import Queue
-from typing import Any, Sequence
+from typing import Any
 
 import numpy as np
 
+from ..thread import StoppableThread
 from .listeners import Recorder
 from .procedure import Procedure
 from .results import Results
-from ..thread import StoppableThread
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 try:
-    import zmq
     import cloudpickle
+    import zmq
 except ImportError:
     zmq = None
     cloudpickle = None
@@ -62,7 +63,7 @@ class Worker(StoppableThread):
 
         self.port = port
         if not isinstance(results, Results):
-            raise ValueError("Invalid Results object during Worker construction")
+            raise TypeError("Invalid Results object during Worker construction")
         self.results = results
         self.results.procedure.check_parameters()
         self.results.procedure.status = Procedure.QUEUED
@@ -88,10 +89,10 @@ class Worker(StoppableThread):
         if self.port is not None and zmq is not None:
             try:
                 self.context = zmq.Context()
-                log.debug("Worker ZMQ Context: %r" % self.context)
+                log.debug(f"Worker ZMQ Context: {self.context!r}")
                 self.publisher = self.context.socket(zmq.PUB)
-                self.publisher.bind('tcp://*:%d' % self.port)
-                log.info("Worker connected to tcp://*:%d" % self.port)
+                self.publisher.bind(f'tcp://*:{self.port}')
+                log.info(f"Worker connected to tcp://*:{self.port}")
                 # wait so that the socket will be ready before starting to emit messages
                 time.sleep(0.3)
             except Exception:
@@ -130,7 +131,7 @@ class Worker(StoppableThread):
 
     def handle_batch_record(self, record: Any):
         if self._is_dictionary_of_sequences(record):
-            lengths = list(len(value) for value in record.values())
+            lengths = [len(value) for value in record.values()]
             if not all(length == lengths[0] for length in lengths):
                 log.error(
                     'Data loss detected: not all sequences in the batch have the same length.'
@@ -226,15 +227,12 @@ class Worker(StoppableThread):
             self.procedure.execute()
         except (KeyboardInterrupt, SystemExit):
             self.handle_abort()
-        except Exception:
+        except Exception:  # noqa: BLE001
             self.handle_error()
         finally:
             self.shutdown()
             self.stop()
 
     def __repr__(self):
-        return "<{}(port={},procedure={},should_stop={})>".format(
-            self.__class__.__name__, self.port,
-            self.procedure.__class__.__name__,
-            self.should_stop()
-        )
+        return (f"<{self.__class__.__name__}(port={self.port},"
+                f"procedure={self.procedure.__class__.__name__},should_stop={self.should_stop()})>")

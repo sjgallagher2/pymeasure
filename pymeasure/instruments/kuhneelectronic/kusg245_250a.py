@@ -25,8 +25,7 @@
 import time
 
 from pymeasure.instruments import Instrument
-from pymeasure.instruments.validators import truncated_range, truncated_discrete_set
-
+from pymeasure.instruments.validators import truncated_discrete_set, truncated_range
 
 byteorder = 'big'
 encoding = 'utf-8'
@@ -45,9 +44,7 @@ def _err_msg_invalid_termination_character(b):
 def _is_expecting_acknowledgement(command):
     if command in ["v", "5", "8", "6", "7", "T"]:
         return False
-    if command.endswith("?"):
-        return False
-    return True
+    return not command.endswith("?")
 
 
 class Kusg245_250A(Instrument):
@@ -83,13 +80,12 @@ class Kusg245_250A(Instrument):
                          asrl={"baud_rate": 115200,
                                "read_termination": termination_character,
                                "write_termination": termination_character},
-                         includeSCPI=False,
                          **kwargs)
 
         self._power_limit = power_limit
         self.power_setpoint_values = [0, power_limit]
 
-    version = Instrument.measurement("v", """Get firmware version.""")
+    version = Instrument.measurement("v", """Get firmware version.""", cast=str)
 
     @property
     def voltage_5v(self):
@@ -242,6 +238,7 @@ class Kusg245_250A(Instrument):
         """,
         validator=truncated_range,
         values=[2400, 2500],
+        cast=str,
         get_process=lambda v: int(v[:-3]) if v.endswith("MHz") else None,
     )
 
@@ -257,6 +254,7 @@ class Kusg245_250A(Instrument):
         """,
         validator=truncated_range,
         values=[2400000, 2500000],
+        cast=str,
         set_process=lambda v: round(v, -1),
         get_process=lambda v: int(v[:-3]) if v.endswith("kHz") else None,
     )

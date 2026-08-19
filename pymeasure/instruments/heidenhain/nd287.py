@@ -23,9 +23,10 @@
 #
 
 import logging
-from pyvisa.errors import VisaIOError
-from pymeasure.instruments import Instrument
 
+from pyvisa.errors import VisaIOError
+
+from pymeasure.instruments import Instrument
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -67,7 +68,6 @@ class ND287(Instrument):
         super().__init__(
             adapter,
             name,
-            includeSCPI=False,
             write_termination="\r",
             **kwargs
         )
@@ -92,7 +92,7 @@ class ND287(Instrument):
 
     @units.setter
     def units(self, unit):
-        if unit in self.position_get_process_map.keys():
+        if unit in self.position_get_process_map:
             self._units = unit
             self.position_get_process = self.position_get_process_map[unit]
 
@@ -108,6 +108,6 @@ class ND287(Instrument):
             err_str = None
 
         if err_str is not None:
-            log.error("Heidenhain ND287 error message received: %s" % err_str)
+            log.error(f"Heidenhain ND287 error message received: {err_str}")
 
         return err_str

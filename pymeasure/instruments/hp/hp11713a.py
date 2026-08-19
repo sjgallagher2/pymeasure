@@ -22,7 +22,8 @@
 # THE SOFTWARE.
 #
 import logging
-from pymeasure.instruments import Instrument, Channel
+
+from pymeasure.instruments import Channel, Instrument
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -123,14 +124,13 @@ class HP11713A(Instrument):
     ATTENUATOR_X = {}
     ATTENUATOR_Y = {}
 
-    channels = Instrument.MultiChannelCreator(SwitchDriverChannel, list(range(0, 9)))
+    channels = Instrument.MultiChannelCreator(SwitchDriverChannel, list(range(9)))
 
     def __init__(self, adapter, name="Hewlett-Packard HP11713A",
                  **kwargs):
         super().__init__(
             adapter,
             name,
-            includeSCPI=False,
             send_end=True,
             **kwargs,
         )

@@ -23,11 +23,13 @@
 #
 
 import logging
+from collections.abc import Callable
 from enum import IntFlag
+from typing import Literal
 
-from pymeasure.instruments import Instrument, validators
 from pyvisa.constants import Parity, StopBits
 
+from pymeasure.instruments import Instrument, cast_or_str, validators
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -48,10 +50,10 @@ def setpoint_validator(value, values):
         return validators.strict_range(value, values)
 
 
-def power_get_process_generator(minimum):
+def power_get_process_generator(minimum: float) -> Callable[..., float]:
     """Generate a get_process for the power property."""
-    def get_process(value):
-        if isinstance(value, float):
+    def get_process(value: Literal["Off", "Low"] | float) -> float:
+        if isinstance(value, (float, int)):
             return value
         elif value == "Off":
             return 0
@@ -74,7 +76,6 @@ class YAR(Instrument):
         kwargs.setdefault("read_termination", "\r")
         super().__init__(adapter,
                          name=name,
-                         includeSCPI=False,
                          asrl={'parity': Parity.none, 'stop_bits': StopBits.one},
                          **kwargs)
 
@@ -121,7 +122,7 @@ class YAR(Instrument):
     @property
     def id(self):
         """Get the model number."""
-        return self.values("RMN")[0]
+        return self.values("RMN", cast=str)[0]
 
     @property
     def status(self):
@@ -143,6 +144,7 @@ class YAR(Instrument):
     power = Instrument.measurement(
         "ROP",
         "Measure current output power in W.",
+        cast=cast_or_str(float),
         get_process=power_get_process_generator(0.1),
         dynamic=True,
     )

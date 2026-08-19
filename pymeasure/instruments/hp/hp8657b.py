@@ -24,6 +24,7 @@
 
 import logging
 from enum import IntEnum
+
 from pymeasure.instruments import Instrument
 from pymeasure.instruments.validators import strict_discrete_set, strict_range
 
@@ -41,7 +42,6 @@ class HP8657B(Instrument):
         super().__init__(
             adapter,
             name,
-            includeSCPI=False,
             send_end=True,
             **kwargs,
         )
@@ -122,7 +122,7 @@ class HP8657B(Instrument):
         "FM %3.1fKZ",
         """
         Set the peak deviation in kHz for the FM function,
-        useable range 0.1 - 400 kHz
+        usable range 0.1 - 400 kHz
 
         *NOTE*:
             the maximum usable deviation is depending on the output frequency, refer to the

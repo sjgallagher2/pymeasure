@@ -23,9 +23,9 @@
 #
 
 import logging
-from typing import Union
 
 import serial
+
 from .adapter import Adapter
 
 log = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class SerialAdapter(Adapter):
 
     def __init__(
         self,
-        port: Union[str, serial.SerialBase],
+        port: str | serial.SerialBase,
         write_termination: str = "",
         read_termination: str = "",
         **kwargs,
@@ -112,7 +112,7 @@ class SerialAdapter(Adapter):
             Multiple of these transactions will occur.
         """
         # `Serial.readlines()` has an unpredictable timeout, see PR #866
-        data = bytes()
+        data = b""
         while True:
             chunk = self.connection.read(chunk_size, **kwargs)
             data += chunk
@@ -124,4 +124,4 @@ class SerialAdapter(Adapter):
         self.connection.reset_input_buffer()
 
     def __repr__(self) -> str:
-        return "<SerialAdapter(port='%s')>" % self.connection.port
+        return f"<SerialAdapter(port='{self.connection.port}')>"

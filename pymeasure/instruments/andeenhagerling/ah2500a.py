@@ -22,9 +22,9 @@
 # THE SOFTWARE.
 #
 
+import logging
 import math
 import re
-import logging
 
 from pymeasure.instruments import Instrument
 from pymeasure.instruments.validators import strict_range
@@ -49,7 +49,6 @@ class AH2500A(Instrument):
             write_termination=write_termination,
             read_termination=read_termination,
             timeout=timeout,
-            includeSCPI=False,
             **kwargs
         )
         self._triggered = False
@@ -101,7 +100,7 @@ class AH2500A(Instrument):
             log.warning("Excess noise, check your experiment setup")
             return (math.nan, math.nan, math.nan)
         else:  # some unknown return string (e.g. misconfigured units)
-            raise Exception(f'Returned string "{string}" could not be parsed')
+            raise ValueError(f'Returned string "{string}" could not be parsed')
 
     def trigger(self):
         """
