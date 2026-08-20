@@ -113,6 +113,8 @@ Przemysław Piróg
 Niklas Schulz
 Haotian Zhang
 Maduka Ariyasiri
-Sam Gallagher
+Jonas Grage
 Max Tweedale
 Muralidhar M Shenoy
+Vincent Gao
+Sam Gallagher
