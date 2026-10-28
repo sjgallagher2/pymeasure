@@ -30,6 +30,29 @@ from pymeasure.instruments.generic_types import SCPIMixin
 from pymeasure.instruments.validators import strict_discrete_set, strict_range
 from pymeasure.instruments._strenum import StrEnum
 
+"""
+Functionality notes:
+
+Phase angle of the output waveform when starting or stopping output can be controlled
+using DEGREE ON = x, DEGREE OFF = y, from the front panel. OFF=IMMED means output stops immediately.
+Using OFF=360 is the same as OFF=IMMED.
+
+The output impedance can be programmed with a given resistance and inductance.
+
+There are three modes for programmable output:
+    LIST mode       Program output changes by programming a number of _sequences_, where each
+                    sequence has independent control of the output amplitude, starting phase angle,
+                    initial and final waveforms (A,B), and sequence length. Then you can repeat
+                    the list (of sequences) some number of times, or trigger it manually each run.
+
+    PULSE mode      Change the output amplitude, waveform, phase angle for a fixed amount of time
+
+    STEP mode       Change the output amplitude in steps, with a dwell time for each step, a dV
+                    voltage delta to change for each step, and an output phase angle for each step.
+
+Output frequency can also be controlled in these.
+"""
+
 
 class Chroma6150x(SCPIMixin, Instrument):
     """Represents the Chroma 6150x family of programmable AC sources.
@@ -571,3 +594,4 @@ class Chroma61505(Chroma6150x):
         self.current_setpoint_ac_values = [0, self.IRMS_MAX]
         self.current_setpoint_dc_values = [0, self.IPEAK_MAX]
         self.voltage_trigger_level_values = [0, self.VRMS_MAX]
+
